@@ -1,0 +1,776 @@
+================================================================================
+  HJR-SYSTEM — HYBRID JOB RECOMMENDER SYSTEM
+  Complete Project Documentation
+  Last updated: 2026-04-22
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+  1.  Project Overview
+  2.  Repository Structure
+  3.  Technology Stack
+  4.  Dataset
+  5.  System Architecture
+  6.  Recommendation Engine
+        5a. Content-Based Filtering (CBF)
+        5b. Collaborative Filtering (CF)
+        5c. Hybrid Scoring & Dynamic Weights
+  7.  Backend — Django REST API
+        6a. URL Routes
+        6b. Authentication (JWT)
+        6c. User Profile & Resume Upload
+        6d. Job Interactions
+        6e. Database Models
+  8.  Frontend — React SPA
+        7a. Pages
+        7b. Routing
+        7c. API Client
+        7d. Interaction Tracking
+  9.  Setup & Running
+  10. API Reference
+  11. Test Results (test_recommender.py)
+  12. Known Limitations & Future Work
+
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+HJR-System is a full-stack hybrid job recommender system built as a dissertation
+project. It combines Content-Based Filtering (CBF) and Collaborative Filtering
+(CF) into a single weighted hybrid model that adapts its strategy per user
+based on how much interaction history they have accumulated.
+
+Key design goals:
+  - Cold-start safety: new users with no history get pure CBF (profile-driven)
+  - Progressive personalisation: as interactions grow the CF signal increases
+  - Real-user support: registered accounts use their DB profile and interactions
+  - CSV fallback: 500 synthetic users (U001-U500) allow testing without login
+
+The system is composed of:
+  - A Django REST API (backend) that hosts the recommendation engine and auth
+  - A React single-page app (frontend) that renders cards and captures clicks
+  - A PostgreSQL database for user accounts, profiles, and job interactions
+  - Three CSV files (data/) that seed the job catalogue and synthetic users
+
+
+================================================================================
+2. REPOSITORY STRUCTURE
+================================================================================
+
+HJR-System/
+├── documentation.txt              ← this file
+├── documentation.md               ← older version (superseded)
+│
+├── frontend/                      React 18 single-page application
+│   ├── public/
+│   │   └── index.html             HTML shell
+│   ├── src/
+│   │   ├── App.jsx                Root component: route definitions + PrivateRoute
+│   │   ├── index.jsx              ReactDOM.createRoot entry point
+│   │   ├── api.js                 Axios instance with JWT interceptors
+│   │   └── pages/
+│   │       ├── LoginPage.jsx      Sign-in form → POST /api/auth/login/
+│   │       ├── RegisterPage.jsx   Registration + optional resume upload
+│   │       ├── RecommendationsPage.jsx  Main job grid + interaction tracking
+│   │       └── ProfilePage.jsx    View / edit profile + resume re-upload
+│   ├── package.json               React 18, React Router 7, Axios; proxy → :8000
+│   └── package-lock.json
+│
+└── backend/                       Django 4.x REST API + recommender engine
+    ├── config/
+    │   ├── settings.py            Django settings (JWT, CORS, PostgreSQL, DRF)
+    │   ├── urls.py                Root URL conf: /api/ branches to app urls
+    │   └── wsgi.py                WSGI entry point
+    ├── data/
+    │   ├── jobs.csv               2,003 deduplicated IT job listings
+    │   ├── users.csv              500 synthetic user profiles (U001-U500)
+    │   └── interactions.csv       4,869 binary user-job interaction records
+    ├── accounts/
+    │   ├── models.py              UserProfile, JobInteraction Django models
+    │   ├── views.py               Register, Login, Logout, Profile, ResumeUpload
+    │   ├── serializers.py         DRF serializers for auth payloads
+    │   └── urls.py                /api/auth/* routes
+    ├── recommender/
+    │   ├── engine.py              ContentBasedFilter, CollaborativeFilter,
+    │   │                          HybridRecommender, build_engine(), get_recommender()
+    │   ├── apps.py                RecommenderConfig.ready() — loads CSVs at startup
+    │   ├── views.py               RecommendationsView, JobInteractView
+    │   ├── serializers.py         JobRecommendationSerializer
+    │   └── urls.py                /api/recommendations/, /api/jobs/interact/
+    ├── test_recommender.py        Standalone engine test (no Django server needed)
+    ├── manage.py                  Django management CLI
+    └── requirements.txt           Python dependencies
+
+
+================================================================================
+3. TECHNOLOGY STACK
+================================================================================
+
+Backend
+  Python           3.10
+  Django           >=4.2, <5.0
+  Django REST Framework  >=3.14
+  djangorestframework-simplejwt  (JWT access + refresh tokens)
+  django-cors-headers  (CORS_ALLOW_ALL_ORIGINS = True in dev)
+  scikit-learn     >=1.3   (TfidfVectorizer, cosine_similarity)
+  pandas           >=2.1   (DataFrame operations)
+  numpy            >=1.26  (array maths)
+  scipy            >=1.11  (pearsonr)
+  nltk             >=3.8   (used in resume skill extraction)
+  pypdfium2                (PDF parsing for resume upload)
+  PostgreSQL               (user accounts, profiles, job interactions)
+
+Frontend
+  React            18.2.0
+  React Router DOM 7.14.1
+  Axios            1.15.1
+  react-scripts    5.0.1 (CRA build toolchain)
+  All styling: inline CSS-in-JS (no external stylesheet or component library)
+
+Dev tooling
+  npm proxy        localhost:8000  (CRA proxies /api/* to Django in development)
+
+
+================================================================================
+4. DATASET
+================================================================================
+
+All CSV files live at: backend/data/
+
+---- jobs.csv ---------------------------------------------------------------
+
+  Rows    : 2,003  (deduplicated from original 2,500; 497 duplicate
+                    job_title+company pairs removed, first occurrence kept)
+  Columns : job_id, job_title, company, location, required_skills, description
+  Job IDs : J0001 – J2500 (non-contiguous after deduplication)
+  Skills  : semicolon-separated (e.g. "Python;Django;REST APIs")
+
+---- users.csv --------------------------------------------------------------
+
+  Rows    : 500
+  Columns : user_id, current_title, education, skills, experience_years
+  User IDs: U001 – U500
+  Skills  : semicolon-separated
+
+---- interactions.csv -------------------------------------------------------
+
+  Rows    : 4,869  (remapped and deduplicated after job deduplication;
+                    original 5,129 rows reduced by collapsing references to
+                    removed duplicate job IDs back to their canonical job ID)
+  Columns : user_id, job_id, interaction
+  Values  : interaction = 1 (positive: applied / interested)
+                        = 0 (negative: skipped)
+
+  Most active user  : U162 — 13 positive interactions
+  Mid-range example : U083 — 7 positive interactions
+
+Deduplication rationale:
+  The original 2,500-job dataset contained 497 pairs where job_title and
+  company were identical. These caused the CF engine to return 5 copies of
+  the same job title/company in top-N results. Deduplication resolved this
+  while preserving all distinct job listings.
+
+
+================================================================================
+5. SYSTEM ARCHITECTURE
+================================================================================
+
+Django startup sequence:
+  RecommenderConfig.ready()
+      ├── Read jobs.csv, users.csv, interactions.csv into pandas DataFrames
+      ├── Cast all ID columns to str
+      └── build_engine(job_df, user_df, interaction_df)
+              └── HybridRecommender.__init__()
+                      ├── ContentBasedFilter.fit(job_df)   — builds TF-IDF matrix
+                      └── CollaborativeFilter.fit(interaction_df)  — builds pivot table
+
+The engine is held as a module-level singleton (_recommender). All requests
+share the same fitted model; no re-fitting on each request.
+
+Request flow (unauthenticated / CSV user):
+  GET /api/recommendations/?user_id=U001&n=5
+      └── RecommendationsView.get()
+              ├── Validate params
+              ├── get_recommender().recommend(user_id="U001", n=5, db_user=None)
+              │       ├── _dynamic_weights("U001") → (α, β)
+              │       ├── CBF: ContentBasedFilter.score(user_row) → {job_id: score}
+              │       ├── CF:  CollaborativeFilter.score("U001")  → {job_id: score}
+              │       ├── hybrid[j] = α × cbf[j] + β × cf[j]  for each job
+              │       └── return sorted top-n as list[dict]
+              └── Return JSON with user_id, weights, count, recommendations
+
+Request flow (authenticated / DB user):
+  GET /api/recommendations/?n=5
+  Authorization: Bearer <access_token>
+      └── RecommendationsView.get()
+              ├── JWT decoded → db_user = request.user
+              ├── user_id = "db_{db_user.pk}"
+              ├── get_recommender().recommend(user_id, n, db_user=db_user)
+              │       ├── _dynamic_weights uses JobInteraction.objects.count()
+              │       ├── CBF: _profile_to_series(db_user) → Series from UserProfile
+              │       └── CF:  _cf_scores_for_db_user() → rebuild matrix with DB rows
+              └── Return JSON
+
+Interaction tracking flow:
+  POST /api/jobs/interact/
+  Authorization: Bearer <access_token>
+  Body: { "job_id": "J0042", "interaction_type": "viewed" }
+      └── JobInteractView.post()
+              └── JobInteraction.objects.create(user, job_id, interaction_type)
+
+
+================================================================================
+6. RECOMMENDATION ENGINE
+================================================================================
+
+File: backend/recommender/engine.py
+
+--------------------------------------------------------------------------------
+6a. Content-Based Filtering (CBF)
+    Class: ContentBasedFilter
+--------------------------------------------------------------------------------
+
+Represents every job and each user as a TF-IDF vector, then scores jobs by
+cosine similarity to the user's profile vector.
+
+Job document (built from CSV or job_df row):
+  "{job_title} {required_skills (;→space)} {description}"  (lowercased)
+
+User document (built from user_df row or UserProfile):
+  "{current_title} {education} {skills (;→space)}"  (lowercased)
+
+TF-IDF configuration:
+  analyzer      = "word"
+  ngram_range   = (1, 2)   — unigrams and bigrams
+  min_df        = 1
+  stop_words    = "english"
+  sublinear_tf  = True
+
+Score range: [0.0, 1.0]  (cosine similarity)
+
+Methods:
+  fit(job_df)          → builds self._job_matrix (sparse TF-IDF), self._job_ids
+  score(user_row)      → returns dict {job_id: float}
+
+--------------------------------------------------------------------------------
+6b. Collaborative Filtering (CF)
+    Class: CollaborativeFilter
+--------------------------------------------------------------------------------
+
+User-based CF using Pearson correlation on a User-Item interaction matrix.
+
+Interaction matrix:
+  pivot_table(index="user_id", columns="job_id", values="interaction", fill_value=0)
+
+Neighbour selection:
+  - Pearson correlation over union of non-zero items for each user pair
+  - Minimum 2 shared items required (otherwise skipped)
+  - Users with zero variance in their interaction vector are skipped
+  - Top-K = 5 neighbours selected
+
+Score formula for job j and user u:
+  S_CF(u, j) = Σ[ sim(u,v) × r(v,j) ] / Σ|sim(u,v)|   (over top-K neighbours)
+  Clamped to [0.0, 1.0]
+
+For authenticated DB users: _cf_scores_for_db_user() merges CSV interactions
+with the user's live DB JobInteraction rows into a temporary matrix, scored
+without modifying the global CF instance.
+
+Methods:
+  fit(interaction_df)  → builds self._matrix (pivot table)
+  score(user_id)       → returns dict {job_id: float}
+
+--------------------------------------------------------------------------------
+6c. Hybrid Scoring & Dynamic Weights
+    Class: HybridRecommender
+--------------------------------------------------------------------------------
+
+Final score:
+  S_Hybrid(u, j) = α × S_CBF(u, j) + β × S_CF(u, j)
+
+Dynamic weight formula (_dynamic_weights):
+
+  count = number of positive interactions for the user
+
+  if count < MIN_INTERACTIONS (3):
+      α = 1.0,  β = 0.0          ← pure CBF (cold start)
+  else:
+      t = min(1.0,  log1p(count - 3) / log1p(10))
+      α = 1.0 - t × (1.0 - MIN_CBF_ALPHA)    floor  = 0.30
+      β = t × MAX_CF_BETA                     ceiling = 0.70
+
+Constants:
+  MIN_INTERACTIONS = 3
+  MAX_CF_BETA      = 0.7
+  MIN_CBF_ALPHA    = 0.3
+
+Weight examples by interaction count:
+  count  0–2  →  α=1.0000,  β=0.0000  (pure CBF)
+  count  3    →  α=1.0000,  β=0.0000  (threshold, still pure CBF)
+  count  4    →  α=0.7977,  β=0.2023
+  count  7    →  α=0.5302,  β=0.4698
+  count  13   →  α=0.3000,  β=0.7000  (cap reached)
+  count  14+  →  α=0.3000,  β=0.7000  (capped)
+
+Rationale: log scaling means the shift from CBF to CF happens quickly in the
+early interactions (3→7) and then slows, reflecting diminishing marginal
+information per new interaction at higher counts.
+
+Singleton pattern:
+  build_engine(job_df, user_df, interaction_df)  — called once at startup
+  get_recommender()                              — returns the singleton
+
+
+================================================================================
+7. BACKEND — DJANGO REST API
+================================================================================
+
+Base URL (development): http://localhost:8000/api/
+
+--------------------------------------------------------------------------------
+7a. URL Routes
+--------------------------------------------------------------------------------
+
+  /api/auth/register/           POST   Create account (+ optional profile fields)
+  /api/auth/login/              POST   Obtain JWT access + refresh tokens
+  /api/auth/logout/             POST   Blacklist refresh token
+  /api/auth/token/refresh/      POST   Exchange refresh token for new access token
+  /api/auth/profile/            GET    Retrieve authenticated user's profile
+  /api/auth/profile/            PUT    Update authenticated user's profile
+  /api/auth/profile/resume/     POST   Upload PDF resume; extract + save skills
+  /api/recommendations/         GET    Get top-N job recommendations
+  /api/jobs/interact/           POST   Log a job interaction (viewed / applied)
+
+--------------------------------------------------------------------------------
+7b. Authentication (JWT)
+--------------------------------------------------------------------------------
+
+Library: djangorestframework-simplejwt
+
+  Access token lifetime  : 24 hours
+  Refresh token lifetime : 7 days
+  Rotation               : enabled (new refresh token on each refresh)
+  Blacklist              : enabled (old refresh tokens are invalidated)
+  Auth header format     : Authorization: Bearer <access_token>
+
+Tokens are stored in the browser's localStorage:
+  localStorage.getItem("access_token")
+  localStorage.getItem("refresh_token")
+
+The Axios instance in api.js automatically:
+  - Injects the Bearer token on every outgoing request
+  - Intercepts 401 responses and attempts a silent token refresh
+  - Redirects to /login if the refresh also fails
+
+--------------------------------------------------------------------------------
+7c. User Profile & Resume Upload
+--------------------------------------------------------------------------------
+
+Registration accepts:
+  username (required), email, password (required),
+  current_title, education, skills (comma-separated), experience_years
+
+Resume upload (POST /api/auth/profile/resume/):
+  - Accepts a PDF file (multipart/form-data, field name "resume")
+  - Extracts text using pypdfium2
+  - Parses skill tokens using NLTK
+  - Saves extracted skills (semicolon-separated) to UserProfile.skills
+  - Returns { "extracted_skills": [...] }
+
+During registration, resume upload mode:
+  1. Creates the account with username + password
+  2. Logs the user in (stores tokens)
+  3. Uploads resume and extracts skills
+  4. Navigates directly to the recommendations page
+
+--------------------------------------------------------------------------------
+7d. Job Interactions
+--------------------------------------------------------------------------------
+
+Endpoint: POST /api/jobs/interact/
+Requires:  Authorization: Bearer <token>
+Body:      { "job_id": "J0042", "interaction_type": "viewed" }
+
+Interaction types accepted: "viewed", "applied"
+
+Every click on a job card or the Apply button in the frontend fires this
+endpoint. The interaction is stored in the JobInteraction table and is used
+by the CF engine to re-weight recommendations for that user.
+
+--------------------------------------------------------------------------------
+7e. Database Models
+--------------------------------------------------------------------------------
+
+UserProfile (one-to-one with Django's built-in User):
+  user             ForeignKey(User, CASCADE)
+  current_title    CharField(200, blank=True)
+  education        CharField(200, blank=True)
+  skills           TextField  — semicolon-separated skill list
+  experience_years PositiveIntegerField (default 0)
+  resume_file      FileField  (upload_to="resumes/", nullable)
+
+JobInteraction:
+  user             ForeignKey(User, CASCADE)
+  job_id           CharField(20)
+  interaction_type CharField(10)  — "viewed" or "applied"
+  timestamp        DateTimeField(auto_now_add=True)
+
+Database: PostgreSQL
+  name     : skai_db
+  user     : skai_user
+  password : skai1234
+  host     : localhost
+  port     : 5432
+
+
+================================================================================
+8. FRONTEND — REACT SPA
+================================================================================
+
+Entry: frontend/src/index.jsx → App.jsx (BrowserRouter)
+
+--------------------------------------------------------------------------------
+8a. Pages
+--------------------------------------------------------------------------------
+
+LoginPage  (/login)
+  - Username + password form
+  - POST /api/auth/login/ → stores access_token and refresh_token
+  - Redirects to / on success
+  - "← Home" back link at top
+  - Footer link to /register
+
+RegisterPage  (/register)
+  - Two modes toggled by a button:
+      Manual: username, email, password, title, education, skills, experience
+      Resume: upload PDF → auto-extract skills, auto-login, navigate to /
+  - "← Home" back link at top
+  - Footer link to /login
+
+RecommendationsPage  (/)
+  - Top nav: HJR-System logo, Profile link (if logged in), Logout / Login / Register
+  - Auth banner when logged in: links to /profile to update profile
+  - Search bar: User ID input (unauthenticated) + n (number of results) + button
+  - Renders a responsive grid of compact JobCards (minmax 190px columns)
+  - WeightBadge shows current α/β and mode label
+  - Interaction tracking: every card click and Apply button fires trackInteraction()
+
+  JobCard (inline component):
+    - Card div click       → trackInteraction(job_id)   [logs "viewed" to API]
+    - Job title click      → trackInteraction(job_id)
+    - Apply button click   → trackInteraction(job_id) + open apply URL in new tab
+    - Apply uses e.stopPropagation() to prevent double-firing with card onClick
+    - Skills capped at 4 chips; overflow shown as "+N"
+
+ProfilePage  (/profile)  [PrivateRoute — requires access_token]
+  - Fetches /api/auth/profile/ on mount; redirects to /login on 401
+  - View mode: shows title, education, experience, skill chips
+  - Edit mode: form fields for all profile attributes + Save/Cancel
+  - Resume upload section: replace or add resume PDF → re-extract skills
+  - Top nav: HJR-System logo (→ /) + Logout button
+
+--------------------------------------------------------------------------------
+8b. Routing (App.jsx)
+--------------------------------------------------------------------------------
+
+  /             → RecommendationsPage
+  /login        → LoginPage
+  /register     → RegisterPage
+  /profile      → ProfilePage (wrapped in PrivateRoute)
+  /*            → Navigate to "/"  (404 fallback)
+
+PrivateRoute: checks localStorage for access_token; redirects to /login
+if absent.
+
+--------------------------------------------------------------------------------
+8c. API Client (api.js)
+--------------------------------------------------------------------------------
+
+Axios instance:
+  baseURL: "/api"  (proxied to http://localhost:8000 by CRA in development)
+
+Request interceptor:
+  Reads access_token from localStorage and injects:
+  Authorization: Bearer <token>
+
+Response interceptor:
+  On 401: calls POST /api/auth/token/refresh/ with stored refresh_token
+           On success: retries original request with new token
+           On failure: clears tokens and redirects to /login
+
+--------------------------------------------------------------------------------
+8d. Interaction Tracking (RecommendationsPage.jsx)
+--------------------------------------------------------------------------------
+
+trackInteraction(jobId):
+  - No-op if user is not logged in (isLoggedIn check)
+  - Reads access_token from localStorage
+  - POST /api/jobs/interact/
+      body:    { job_id: jobId, interaction_type: "viewed" }
+      header:  Authorization: Bearer <token>
+  - try/catch swallows all errors — never interrupts the UI
+
+handleApply(jobId):
+  - Calls trackInteraction(jobId)
+  - Opens /jobs/{jobId}/apply in a new browser tab
+
+
+================================================================================
+9. SETUP & RUNNING
+================================================================================
+
+Prerequisites:
+  - Python 3.10+
+  - Node.js 18+
+  - PostgreSQL running locally
+  - A psql database + user already created (see settings.py for credentials)
+
+---- Backend ----------------------------------------------------------------
+
+  cd backend
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install -r requirements.txt
+
+  # Create DB tables
+  python manage.py migrate
+
+  # Start server (default port 8000)
+  python manage.py runserver
+
+---- Frontend ---------------------------------------------------------------
+
+  cd frontend
+  npm install
+  npm start          # opens http://localhost:3000, proxies /api to :8000
+
+---- Standalone Engine Test -------------------------------------------------
+
+  # No server or Django needed
+  source backend/.venv/bin/activate
+  python3 backend/test_recommender.py
+
+  Output is also saved to: backend/test_results.txt
+
+
+================================================================================
+10. API REFERENCE
+================================================================================
+
+All endpoints are prefixed with /api/
+
+---- POST /auth/register/ ---------------------------------------------------
+
+Request body (JSON):
+  username*       string
+  password*       string
+  email           string
+  current_title   string
+  education       string
+  skills          string   (comma-separated)
+  experience_years integer
+
+Response 201:
+  { "access": "<jwt>", "refresh": "<jwt>", "username": "..." }
+
+---- POST /auth/login/ ------------------------------------------------------
+
+Request body:
+  username*  string
+  password*  string
+
+Response 200:
+  { "access": "<jwt>", "refresh": "<jwt>" }
+
+Response 401:
+  { "error": "Invalid credentials." }
+
+---- POST /auth/logout/ -----------------------------------------------------
+
+Request body:
+  refresh*  string   (refresh token to blacklist)
+
+Response 205: empty
+
+---- POST /auth/token/refresh/ ----------------------------------------------
+
+Request body:
+  refresh*  string
+
+Response 200:
+  { "access": "<new_jwt>", "refresh": "<new_jwt>" }
+
+---- GET /auth/profile/ -----------------------------------------------------
+
+Header: Authorization: Bearer <token>
+
+Response 200:
+  {
+    "username": "...",
+    "email": "...",
+    "current_title": "...",
+    "education": "...",
+    "skills": "skill1;skill2;...",
+    "experience_years": 3,
+    "resume_file": "/media/resumes/file.pdf" | null
+  }
+
+---- PUT /auth/profile/ -----------------------------------------------------
+
+Header: Authorization: Bearer <token>
+Body:   any subset of { current_title, education, skills, experience_years }
+
+Response 200: updated profile object (same shape as GET)
+
+---- POST /auth/profile/resume/ ---------------------------------------------
+
+Header:       Authorization: Bearer <token>
+Content-Type: multipart/form-data
+Field:        resume  (PDF file)
+
+Response 200:
+  { "extracted_skills": ["Python", "Django", ...] }
+
+---- GET /recommendations/ --------------------------------------------------
+
+Query params:
+  user_id   string   required if unauthenticated; ignored if JWT present
+  n         integer  default 10, clamped to [1, 50]
+
+Header (optional): Authorization: Bearer <token>
+
+Response 200:
+  {
+    "user_id": "U001",
+    "weights": { "alpha": 1.0, "beta": 0.0 },
+    "count": 5,
+    "recommendations": [
+      {
+        "job_id":         "J0042",
+        "job_title":      "Python Developer",
+        "company":        "Element Skill",
+        "location":       "Bengaluru",
+        "required_skills":"Python;Django;REST APIs",
+        "match_score":    0.5464,
+        "apply_url":      "/jobs/J0042/apply"
+      },
+      ...
+    ]
+  }
+
+Response 400: { "error": "user_id is required for unauthenticated requests." }
+
+---- POST /jobs/interact/ ---------------------------------------------------
+
+Header: Authorization: Bearer <token>
+Body:
+  job_id*           string
+  interaction_type* string   "viewed" | "applied"
+
+Response 201: { "status": "ok" }
+Response 400: invalid body
+Response 401: missing / expired token
+
+
+================================================================================
+11. TEST RESULTS  (backend/test_recommender.py)
+================================================================================
+
+Run date   : 2026-04-22
+Dataset    : 2,003 jobs | 500 users | 4,869 interactions
+
+---- TEST 1 — Content-Based Filtering (Temporary Profile) -------------------
+
+  Profile : Python Developer | BSc Computer Science
+  Skills  : Python; Django; REST APIs | Experience: 2 years
+  Weights : α=1.0000, β=0.0000  (0 interactions → pure CBF)
+
+  Rank  Job Title                          Company                      Score
+  ----  ---------------------------------  ---------------------------  ------
+  1     Python Developer                   Element Skill                0.5464
+  2     Python Developer                   Hucon Solutions India Pv     0.5436
+  3     Python Developer                   SKYWALK VISA IMMIGRATION     0.5436
+  4     Lead Python Developer              Sparks To Ideas              0.4679
+  5     Python Developer Internship        Maxgen Technologies          0.4534
+
+  Interpretation: TF-IDF correctly surfaces Python/Django-oriented roles.
+  Score range ~0.45–0.55 reflects strong skill overlap with the top candidates.
+
+---- TEST 2 — Collaborative Filtering (Most-Active CSV User: U162) ----------
+
+  User   : U162 | 13 positive interactions
+  Weights: α=0.3000, β=0.7000  (cap reached — CF-dominant hybrid)
+
+  Rank  Job Title                          Company                      Score
+  ----  ---------------------------------  ---------------------------  ------
+  1     IT support specialist              Intel Technology India P     0.1734
+  2     IT Support Specialist              Leica Biosystems             0.1643
+  3     IT Support Specialist II           bentley systems pvt ltd      0.1431
+  4     IT Support Specialist Europe       fedexex                      0.1405
+  5     IT Support                         SEVEN CONSULTANCY            0.1210
+
+  Interpretation: CF surfaces IT Support roles from different companies,
+  consistent with U162's interaction pattern (neighbours with IT Support history).
+
+---- TEST 3 — Hybrid Comparison for U162 ------------------------------------
+
+  Pure CBF (α=1.0, β=0.0)              Dynamic Hybrid (α=0.3, β=0.7)
+  -----------------------------------  -----------------------------------
+  1. IT support specialist   0.5781    1. IT support specialist   0.1734
+  2. IT Support Specialist   0.5476    2. IT Support Specialist   0.1643
+  3. IT Support Specialist II 0.4771   3. IT Support Specialist II 0.1431
+  4. IT Support Specialist E  0.4683   4. IT Support Specialist E 0.1405
+  5. IT Support               0.4034   5. IT Support              0.1210
+
+  Rank changes: 0/5   (CF reinforces CBF's ranking for this user)
+  Score drop from CBF to Hybrid: expected — CF scores are lower in magnitude,
+  so blending reduces absolute values while preserving relative order.
+
+---- SUMMARY TABLE ----------------------------------------------------------
+
+  User      α       β       Interactions  Top 3 Job Titles
+  --------  ------  ------  ------------  ----------------------------------------
+  TEST_CBF  1.0000  0.0000             0  Python Developer × 3
+  U083      0.5302  0.4698             7  Android Developer | Hiring for Android | Android Developer
+  U162      0.3000  0.7000            13  IT support specialist | IT Support Specialist | IT Support Specialist II
+
+
+================================================================================
+12. KNOWN LIMITATIONS & FUTURE WORK
+================================================================================
+
+Current limitations:
+  1. CF scores are lower in absolute magnitude than CBF scores.
+     When blended, the hybrid score is numerically smaller than a pure-CBF score
+     even if CF carries useful signal. Future work: normalise CBF and CF score
+     distributions before blending (e.g., min-max or z-score normalisation).
+
+  2. CF requires at least 3 positive interactions before activating and depends
+     on finding neighbours with shared interaction history. Users whose profile
+     is very niche may find no useful neighbours, causing CF to contribute zero.
+
+  3. The engine is loaded once at startup and held in memory. New CSV rows
+     (e.g., a refreshed jobs.csv) require a server restart to take effect.
+     DB user interactions are merged dynamically; CSV data is static.
+
+  4. Jobs are matched against user skills via TF-IDF which treats skill tokens
+     as bag-of-words. Synonyms ("JS" vs "JavaScript") and compound skills
+     ("machine learning" vs "ML") may not match unless both forms appear in the
+     TF-IDF vocabulary. Future work: skill normalisation / embedding-based CBF.
+
+  5. No evaluation suite for the 500-user, 2,003-job dataset exists yet.
+     The metrics in the old documentation.md apply to the original 20-user
+     dataset and are no longer representative.
+
+Future work:
+  - Precision@K / Recall@K evaluation script against the full CSV dataset
+  - Skill normalisation layer before TF-IDF vectorisation
+  - Score normalisation before hybrid blending
+  - Implicit feedback (dwell time, scroll depth) in addition to clicks
+  - Pagination for the recommendations grid
+  - Admin view showing interaction logs per user
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
