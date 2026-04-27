@@ -2,28 +2,25 @@
 Hybrid Job Recommender Engine
 ==============================
 Combines Content-Based Filtering (TF-IDF + Cosine Similarity) and
-Collaborative Filtering (User-Item matrix + Pearson Correlation).
+Collaborative Filtering (User-Item matrix + Cosine Similarity neighbours).
 
   S_Hybrid = α · S_CBF + β · S_CF
 
-All data is loaded from PostgreSQL — no CSV files at runtime.
-
 Dynamic weights:
-  - New users (< MIN_INTERACTIONS applied interactions): α=1.0, β=0.0 (pure CBF)
-  - Experienced users: weights shift toward CF as interaction count grows,
-    capped at α=0.3, β=0.7.
+  - Interaction count is a weighted tally: viewed=0.5, applied=1.0
+  - Below MIN_INTERACTIONS: α=1.0, β=0.0  (pure CBF)
+  - Above threshold: weights shift toward CF, capped at MAX_CF_BETA.
 """
 
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from scipy.stats import pearsonr
 
 
-MIN_INTERACTIONS = 3
-MAX_CF_BETA = 0.7
-MIN_CBF_ALPHA = 0.3
+MIN_INTERACTIONS = 1    # weighted tally before CF starts contributing
+MAX_CF_BETA = 0.6
+MIN_CBF_ALPHA = 0.4
 
 
 class ContentBasedFilter:
@@ -54,20 +51,24 @@ class ContentBasedFilter:
     @staticmethod
     def _job_text(row: pd.Series) -> str:
         skills = str(row.get("required_skills", "")).replace(";", " ")
-        desc = str(row.get("description", ""))
         title = str(row.get("job_title", ""))
-        return f"{title} {skills} {desc}".lower()
+        experience = str(row.get("experience", ""))
+        # repeat title and skills to boost their TF-IDF weight relative to description
+        return f"{title} {title} {skills} {skills} {experience}".lower()
 
     @staticmethod
     def _user_text(row: pd.Series) -> str:
         title = str(row.get("current_title", ""))
         edu = str(row.get("education", ""))
         skills = str(row.get("skills", "")).replace(";", " ")
-        return f"{title} {edu} {skills}".lower()
+        exp_years = int(row.get("experience_years", 0) or 0)
+        level = "senior" if exp_years >= 5 else "mid" if exp_years >= 2 else "junior"
+        # repeat title and skills to match the emphasis in job text
+        return f"{title} {title} {level} {edu} {skills} {skills}".lower()
 
 
 class CollaborativeFilter:
-    _TOP_K = 5
+    _TOP_K = 10
 
     def __init__(self) -> None:
         self._matrix: pd.DataFrame | None = None
@@ -107,33 +108,24 @@ class CollaborativeFilter:
         return {k: max(0.0, min(1.0, v)) for k, v in scores.items()}
 
     def _find_neighbours(self, user_id: str, target: pd.Series) -> list[tuple[str, float]]:
-        correlations: list[tuple[str, float]] = []
+        # Cosine similarity is far more reliable than Pearson for sparse binary data.
+        target_arr = target.values.reshape(1, -1)
+        similarities: list[tuple[str, float]] = []
         for uid in self._matrix.index:
             if uid == user_id:
                 continue
-            other = self._matrix.loc[uid]
-            shared_mask = (target > 0) | (other > 0)
-            if shared_mask.sum() < 2:
-                continue
-            t_vals = target[shared_mask].values
-            o_vals = other[shared_mask].values
-            if t_vals.std() == 0 or o_vals.std() == 0:
-                continue
-            try:
-                corr, _ = pearsonr(t_vals, o_vals)
-            except Exception:
-                continue
-            if not np.isnan(corr):
-                correlations.append((uid, float(corr)))
-        correlations.sort(key=lambda x: x[1], reverse=True)
-        return correlations[: self._TOP_K]
+            other_arr = self._matrix.loc[uid].values.reshape(1, -1)
+            sim = float(cosine_similarity(target_arr, other_arr)[0][0])
+            if sim > 0:
+                similarities.append((uid, sim))
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        return similarities[: self._TOP_K]
 
 
 class HybridRecommender:
     """
-    Weighted hybrid recommender. Jobs are pre-loaded from the DB into memory
-    (TF-IDF matrix built at startup). CF scores are computed on-demand from
-    live JobInteraction rows.
+    Weighted hybrid recommender. The TF-IDF matrix is built once at startup.
+    CF scores are computed on-demand from live JobInteraction rows.
     """
 
     def __init__(self, job_df: pd.DataFrame) -> None:
@@ -149,7 +141,7 @@ class HybridRecommender:
         alpha, beta = self._dynamic_weights(user_id, db_user=db_user)
 
         user_row = self._profile_to_series(db_user) if db_user is not None else pd.Series(
-            {"current_title": "", "education": "", "skills": ""}
+            {"current_title": "", "education": "", "skills": "", "experience_years": 0}
         )
         cbf_scores = self._cbf.score(user_row)
 
@@ -157,12 +149,14 @@ class HybridRecommender:
         if beta > 0 and db_user is not None:
             cf_scores = self._cf_scores_for_db_user(db_user, user_id)
 
-        user_skills = [s.strip() for s in str(user_row.get("skills", "")).split(";") if s.strip()]
-        user_skills_lower = {s.lower() for s in user_skills}
+        user_skills_lower = {
+            s.strip().lower()
+            for s in str(user_row.get("skills", "")).split(";")
+            if s.strip()
+        }
 
-        all_job_ids = self._job_df.index.tolist()
         hybrid: list[tuple[str, float, float, float]] = []
-        for job_id in all_job_ids:
+        for job_id in self._job_df.index:
             cbf_s = cbf_scores.get(job_id, 0.0)
             cf_s = cf_scores.get(job_id, 0.0)
             hybrid.append((job_id, alpha * cbf_s + beta * cf_s, cbf_s, cf_s))
@@ -187,21 +181,7 @@ class HybridRecommender:
             job_skills = [s.strip() for s in str(job.get("required_skills", "")).split(";") if s.strip()]
             matched_skills = [s for s in job_skills if s.lower() in user_skills_lower]
 
-            if cbf_pct > 0.7:
-                driver = "skills_match"
-                if matched_skills:
-                    reason = f"Your {', '.join(matched_skills[:3])} skills match this role"
-                else:
-                    reason = "Your profile is a strong fit for this role"
-            elif cf_pct > 0.7:
-                driver = "people_like_you"
-                reason = "People with your background also applied to this"
-            else:
-                driver = "best_of_both"
-                if matched_skills:
-                    reason = f"Skills match ({', '.join(matched_skills[:2])}) and popular with similar users"
-                else:
-                    reason = "Strong profile fit and popular with similar users"
+            driver, reason = self._label(cbf_pct, cf_pct, matched_skills, job_skills)
 
             results.append({
                 "job_id": job_id,
@@ -217,24 +197,65 @@ class HybridRecommender:
         return results
 
     # ------------------------------------------------------------------
+    # Reason / driver labelling
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _label(cbf_pct: float, cf_pct: float, matched: list[str], job_skills: list[str]) -> tuple[str, str]:
+        n_matched = len(matched)
+        shown = ", ".join(matched[:3])
+
+        if cbf_pct >= 0.7:
+            driver = "skills_match"
+            if matched:
+                reason = f"{n_matched} matching skill{'s' if n_matched > 1 else ''}: {shown}"
+            elif job_skills:
+                reason = f"Your title and experience level suit this role"
+            else:
+                reason = "Profile and experience level match the role requirements"
+
+        elif cf_pct >= 0.7:
+            driver = "people_like_you"
+            if matched:
+                reason = f"Professionals with your {shown} background engaged with this role"
+            else:
+                reason = "Professionals with a similar background engaged with this role"
+
+        else:
+            driver = "best_of_both"
+            if matched:
+                reason = f"{n_matched} skill match{'es' if n_matched > 1 else ''} ({shown}) · trending with similar users"
+            else:
+                reason = "Profile fit reinforced by similar users' activity"
+
+        return driver, reason
+
+    # ------------------------------------------------------------------
     # Weight calculation
     # ------------------------------------------------------------------
 
     def _dynamic_weights(self, user_id: str, db_user=None) -> tuple[float, float]:
-        count = 0
+        """
+        Weighted tally: applied = 1.0 point, viewed = 0.5 points.
+        This lets CF contribute once a user has viewed 2 jobs, rather than
+        requiring 3 explicit applies (which almost never happens in a demo).
+        """
+        weighted_count = 0.0
         if db_user is not None:
             try:
                 from accounts.models import JobInteraction
-                count = JobInteraction.objects.filter(
-                    user=db_user, interaction_type="applied"
-                ).count()
+                for interaction in JobInteraction.objects.filter(user=db_user).values("interaction_type"):
+                    if interaction["interaction_type"] == "applied":
+                        weighted_count += 1.0
+                    else:
+                        weighted_count += 0.5
             except Exception:
-                count = 0
+                pass
 
-        if count < MIN_INTERACTIONS:
+        if weighted_count < MIN_INTERACTIONS:
             return 1.0, 0.0
 
-        t = min(1.0, np.log1p(count - MIN_INTERACTIONS) / np.log1p(10))
+        t = min(1.0, np.log1p(weighted_count - MIN_INTERACTIONS) / np.log1p(10))
         alpha = 1.0 - t * (1.0 - MIN_CBF_ALPHA)
         beta = t * MAX_CF_BETA
         return round(alpha, 4), round(beta, 4)
@@ -251,12 +272,13 @@ class HybridRecommender:
                 "current_title": p.current_title or "",
                 "education": p.education or "",
                 "skills": p.skills or "",
+                "experience_years": p.experience_years or 0,
             })
         except Exception:
-            return pd.Series({"current_title": "", "education": "", "skills": ""})
+            return pd.Series({"current_title": "", "education": "", "skills": "", "experience_years": 0})
 
     def _cf_scores_for_db_user(self, db_user, user_id: str) -> dict[str, float]:
-        """Build CF matrix from all DB interactions and score the target user."""
+        """Build a fresh CF matrix from all DB interactions and score the target user."""
         try:
             from accounts.models import JobInteraction
 

@@ -1,260 +1,240 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api";
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
-const S = {
-  page: { minHeight: "100vh", background: "linear-gradient(135deg,#0f172a 0%,#1e293b 100%)", fontFamily: "'Segoe UI',system-ui,sans-serif", color: "#e2e8f0", padding: "2rem 1rem" },
-  container: { maxWidth: "960px", margin: "0 auto" },
-
-  // Nav
-  nav: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem", flexWrap: "wrap", gap: "0.75rem" },
-  logo: { fontSize: "2.2rem", fontWeight: 800, background: "linear-gradient(90deg,#38bdf8,#818cf8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", letterSpacing: "-0.5px", textDecoration: "none" },
-  navRight: { display: "flex", gap: "0.5rem", alignItems: "center" },
-  navBtn: { padding: "0.45rem 1rem", borderRadius: "8px", border: "1px solid #334155", background: "transparent", color: "#94a3b8", cursor: "pointer", fontSize: "0.85rem", textDecoration: "none" },
-
-  // Personalised header
-  personalizedHeader: { marginBottom: "1.5rem" },
-  headerTitle: { fontSize: "1.6rem", fontWeight: 800, color: "#f1f5f9", margin: "0 0 0.3rem 0" },
-  headerSubtitle: { color: "#64748b", fontSize: "0.9rem", margin: 0 },
-
-  // Profile Summary Card
-  profileCard: { background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "1.25rem", marginBottom: "1.5rem" },
-  profileCardHeader: { display: "flex", alignItems: "center", gap: "1rem" },
-  avatarCircle: { width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg,#38bdf8,#818cf8)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1.1rem", color: "#0f172a", flexShrink: 0 },
-  profileName: { fontWeight: 700, fontSize: "1rem", color: "#f1f5f9" },
-  profileTitle: { fontSize: "0.8rem", color: "#64748b", marginTop: "0.1rem" },
-  profileStats: { marginLeft: "auto", textAlign: "right" },
-  statNum: { fontSize: "1.4rem", fontWeight: 800, color: "#38bdf8", lineHeight: 1 },
-  statLabel: { fontSize: "0.7rem", color: "#64748b", marginTop: "0.1rem" },
-  profileSkillChip: { background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.3)", borderRadius: "4px", padding: "0.15rem 0.5rem", fontSize: "0.72rem", color: "#38bdf8" },
-  weightBarWrap: { marginTop: "1rem" },
-  weightBarLabels: { display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" },
-  weightBarTrack: { height: "8px", background: "#0f172a", borderRadius: "99px", overflow: "hidden", display: "flex" },
-
-  // Legend
-  legend: { display: "flex", gap: "1.25rem", flexWrap: "wrap", marginBottom: "0.75rem", alignItems: "center" },
-  legendItem: { display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem", color: "#94a3b8" },
-
-  // How this works
-  howItWorks: { marginBottom: "1.5rem" },
-  howItWorksToggle: { background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.8rem", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" },
-  howItWorksBody: { marginTop: "0.75rem", background: "#1e293b", border: "1px solid #334155", borderRadius: "10px", padding: "1rem 1.25rem", display: "flex", flexDirection: "column", gap: "0.5rem" },
-  howItWorksLine: { fontSize: "0.82rem", color: "#94a3b8", margin: 0 },
-
-  // Search bar
-  searchBar: { display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap" },
-  input: { flex: 1, minWidth: "180px", padding: "0.65rem 1rem", borderRadius: "10px", border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", fontSize: "0.95rem", outline: "none" },
-  nInput: { width: "80px", padding: "0.65rem 0.75rem", borderRadius: "10px", border: "1px solid #334155", background: "#1e293b", color: "#e2e8f0", fontSize: "0.95rem", outline: "none" },
-  button: { padding: "0.65rem 1.5rem", borderRadius: "10px", border: "none", background: "linear-gradient(135deg,#38bdf8,#818cf8)", color: "#0f172a", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer", whiteSpace: "nowrap" },
-
-  // Section headers / dividers
-  sectionHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem", marginTop: "1.5rem" },
-  sectionTitle: { fontSize: "0.95rem", fontWeight: 700, color: "#e2e8f0" },
-  sectionCount: { fontSize: "0.75rem", color: "#64748b" },
-  sectionDivider: { display: "flex", alignItems: "center", gap: "1rem", margin: "2rem 0 1.5rem 0" },
-  sectionDividerLine: { flex: 1, height: "1px", background: "#334155" },
-  sectionDividerText: { fontSize: "0.78rem", color: "#64748b", whiteSpace: "nowrap" },
-
-  // Grid & cards
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "0.85rem" },
-  card: { background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "0.9rem", transition: "border-color 0.2s,box-shadow 0.2s", display: "flex", flexDirection: "column", gap: "0.5rem", cursor: "pointer" },
-  cardTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.4rem" },
-  jobTitle: { fontSize: "0.83rem", fontWeight: 700, color: "#f1f5f9", margin: "0.2rem 0 0.1rem", lineHeight: 1.3 },
-  company: { fontSize: "0.75rem", color: "#38bdf8" },
-  location: { fontSize: "0.7rem", color: "#64748b", marginTop: "0.05rem" },
-  scoreBox: { textAlign: "right", flexShrink: 0 },
-  scoreLabel: { fontSize: "0.62rem", color: "#64748b", marginBottom: "0.1rem" },
-  scoreValue: { fontSize: "0.95rem", fontWeight: 800, color: "#38bdf8" },
-  progressTrack: { height: "4px", background: "#0f172a", borderRadius: "99px", marginTop: "0.15rem", overflow: "hidden", width: "50px", marginLeft: "auto" },
-  progressBar: (pct) => ({ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg,#38bdf8,#818cf8)", borderRadius: "99px", transition: "width 0.6s ease" }),
-  reasonLine: { fontSize: "0.7rem", color: "#64748b", fontStyle: "italic", margin: 0 },
-  divider: { borderTop: "1px solid #334155", margin: "0" },
-  skillsRow: { display: "flex", flexWrap: "wrap", gap: "0.25rem" },
-  skillChip: { background: "#0f172a", border: "1px solid #334155", borderRadius: "4px", padding: "0.1rem 0.35rem", fontSize: "0.65rem", color: "#94a3b8" },
-  applyBtn: { display: "inline-block", padding: "0.3rem 0.7rem", borderRadius: "6px", background: "linear-gradient(135deg,#38bdf8,#818cf8)", color: "#0f172a", fontWeight: 700, fontSize: "0.72rem", textDecoration: "none", border: "none", cursor: "pointer", alignSelf: "flex-start", marginTop: "auto" },
-
-  // States
-  emptyState: { textAlign: "center", padding: "4rem 1rem", color: "#475569" },
-  error: { background: "#450a0a", border: "1px solid #7f1d1d", borderRadius: "10px", padding: "1rem 1.25rem", color: "#fca5a5", marginBottom: "1.5rem", fontSize: "0.9rem" },
-  spinner: { textAlign: "center", padding: "3rem", color: "#475569", fontSize: "0.95rem" },
+const C = {
+  blue: "#2557a7",
+  pageBg: "#f3f2f1",
+  white: "#ffffff",
+  border: "#d4d2d0",
+  text: "#2d2d2d",
+  text2: "#595959",
+  text3: "#767676",
+  blueLight: "#e8f0fe",
+  red: "#b91c1c",
 };
 
-// ─── Driver Badge ─────────────────────────────────────────────────────────────
 const DRIVER_CONFIG = {
-  skills_match:   { label: "Skills Match",    color: "#0ea5e9", bg: "rgba(14,165,233,0.12)",  border: "rgba(14,165,233,0.4)" },
-  people_like_you:{ label: "People Like You", color: "#22c55e", bg: "rgba(34,197,94,0.12)",   border: "rgba(34,197,94,0.4)" },
-  best_of_both:   { label: "Best of Both",    color: "#a78bfa", bg: "rgba(167,139,250,0.12)", border: "rgba(167,139,250,0.4)" },
+  skills_match:    { label: "Skills Match",    color: "#2557a7", bg: "#e8f0fe", border: "#b8d0f8" },
+  people_like_you: { label: "People Like You", color: "#007c5f", bg: "#e6f3ef", border: "#a8d4c8" },
+  best_of_both:    { label: "Best of Both",    color: "#7c3aed", bg: "#f3e8ff", border: "#c4b0f0" },
 };
 
-function DriverBadge({ driver }) {
-  const c = DRIVER_CONFIG[driver] || DRIVER_CONFIG.skills_match;
+const S = {
+  page: { minHeight: "100vh", background: C.pageBg, fontFamily: "Arial,Helvetica,sans-serif", color: C.text },
+
+  header: {
+    background: C.white, borderBottom: "2px solid #e0dede", padding: "0.75rem 1.5rem",
+    position: "sticky", top: 0, zIndex: 100, boxShadow: "0 2px 4px rgba(0,0,0,0.06)",
+  },
+  headerInner: { maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" },
+  logo: { fontSize: "2rem", fontWeight: 900, color: C.blue, textDecoration: "none", letterSpacing: "-1px", fontStyle: "italic", flexShrink: 0 },
+
+  searchGroup: {
+    display: "flex", flex: 1, maxWidth: "640px", border: `2px solid ${C.border}`,
+    borderRadius: "8px", overflow: "hidden", background: C.white, boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+  },
+  searchInput: { flex: 1, padding: "0.7rem 1rem", border: "none", outline: "none", fontSize: "0.95rem", color: C.text, background: "transparent" },
+  searchDivider: { width: "1px", background: C.border },
+  nInput: { width: "72px", padding: "0.7rem 0.5rem", border: "none", borderLeft: `1px solid ${C.border}`, outline: "none", fontSize: "0.95rem", color: C.text, textAlign: "center", background: "transparent" },
+  findBtn: { padding: "0.7rem 1.4rem", background: C.blue, color: C.white, border: "none", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer" },
+
+  navBtns: { display: "flex", gap: "0.5rem", alignItems: "center", marginLeft: "auto" },
+  navLink: { padding: "0.45rem 0.9rem", borderRadius: "4px", border: `1px solid ${C.blue}`, color: C.blue, fontWeight: 600, fontSize: "0.85rem", textDecoration: "none", display: "inline-block" },
+  navLinkFill: { padding: "0.45rem 0.9rem", borderRadius: "4px", background: C.blue, color: C.white, fontWeight: 600, fontSize: "0.85rem", textDecoration: "none", display: "inline-block", border: "none", cursor: "pointer" },
+
+  profileBanner: { borderBottom: `1px solid ${C.border}`, padding: "0.5rem 1.5rem", background: C.white },
+  profileBannerInner: { maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", gap: "0.65rem", fontSize: "0.88rem", color: C.text2 },
+  avatarXs: { width: "28px", height: "28px", borderRadius: "50%", background: C.blue, color: C.white, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "0.8rem", flexShrink: 0 },
+
+  main: { maxWidth: "1200px", margin: "0 auto", padding: "1rem 1.5rem", display: "flex", gap: "1rem", alignItems: "flex-start" },
+
+  leftCol: { flex: "0 0 44%", minWidth: 0 },
+  resultsCount: { fontSize: "0.88rem", color: C.text2, marginBottom: "0.75rem", fontWeight: 600 },
+
+  jobCard: { background: C.white, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "1rem 1.25rem", marginBottom: "0.5rem", cursor: "pointer" },
+  jobCardActive: { borderLeft: `4px solid ${C.blue}`, background: "#f0f4ff" },
+
+  cardRow: { display: "flex", gap: "0.8rem", alignItems: "flex-start" },
+  companyInitial: { width: "42px", height: "42px", borderRadius: "8px", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "1rem", color: C.blue, background: C.blueLight, flexShrink: 0 },
+  cardMeta: { flex: 1, minWidth: 0 },
+  jTitle: { fontSize: "0.98rem", fontWeight: 700, color: C.blue, margin: "0 0 0.12rem", lineHeight: 1.3, textDecoration: "underline" },
+  jCompany: { fontSize: "0.85rem", color: C.text, margin: "0 0 0.06rem" },
+  jLocation: { fontSize: "0.8rem", color: C.text3, margin: 0 },
+  matchCol: { flexShrink: 0, textAlign: "right" },
+  matchPct: { fontSize: "1.1rem", fontWeight: 800, color: C.blue },
+  matchSub: { fontSize: "0.68rem", color: C.text3 },
+
+  cardSnippet: { fontSize: "0.84rem", color: C.text2, margin: "0.5rem 0 0.4rem", lineHeight: 1.55 },
+  cardBottom: { display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.3rem", marginTop: "0.4rem" },
+  driverPill: { borderRadius: "20px", padding: "0.15rem 0.6rem", fontSize: "0.72rem", fontWeight: 600 },
+  skillsRow: { display: "flex", flexWrap: "wrap", gap: "0.25rem" },
+  skillChip: { background: "#f1f1f1", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "0.1rem 0.4rem", fontSize: "0.73rem", color: C.text2 },
+
+  rightCol: { flex: 1, position: "sticky", top: "76px", maxHeight: "calc(100vh - 90px)", overflowY: "auto" },
+  detailPanel: { background: C.white, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "1.5rem 1.75rem" },
+  dTitle: { fontSize: "1.4rem", fontWeight: 700, color: C.text, margin: "0 0 0.3rem", lineHeight: 1.3 },
+  dCompany: { fontSize: "0.95rem", color: C.text, margin: "0 0 0.15rem" },
+  dLocation: { fontSize: "0.9rem", color: C.text3, margin: "0 0 1rem" },
+  dMatchRow: { display: "flex", gap: "1rem", alignItems: "center", marginBottom: "1.25rem" },
+  dMatchNum: { fontSize: "2rem", fontWeight: 900, color: C.blue, lineHeight: 1 },
+  dMatchLabel: { fontSize: "0.8rem", color: C.text3, marginTop: "0.2rem" },
+  applyBtn: { display: "block", width: "100%", boxSizing: "border-box", padding: "0.85rem", background: C.blue, color: C.white, border: "none", borderRadius: "4px", fontWeight: 700, fontSize: "1rem", cursor: "pointer", marginBottom: "0.75rem" },
+  hr: { border: "none", borderTop: `1px solid ${C.border}`, margin: "1.25rem 0" },
+  sectionTitle: { fontSize: "0.95rem", fontWeight: 700, color: C.text, marginBottom: "0.5rem", marginTop: "1rem" },
+  sectionText: { fontSize: "0.9rem", color: C.text2, lineHeight: 1.6, margin: 0 },
+
+  emptyPanel: { background: C.white, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "3.5rem 2rem", textAlign: "center", color: C.text3 },
+  emptyIcon: { fontSize: "2.5rem", marginBottom: "0.75rem" },
+  emptyTitle: { fontSize: "1rem", fontWeight: 600, margin: "0 0 0.3rem", color: C.text },
+  emptyHint: { fontSize: "0.85rem", margin: 0 },
+
+  loginPrompt: { background: C.white, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "3rem 2rem", textAlign: "center", maxWidth: "480px", margin: "3rem auto" },
+  loginPromptTitle: { fontSize: "1.2rem", fontWeight: 700, color: C.text, margin: "0 0 0.5rem" },
+  loginPromptText: { fontSize: "0.9rem", color: C.text2, margin: "0 0 1.5rem" },
+  loginPromptBtn: { display: "inline-block", padding: "0.7rem 2rem", background: C.blue, color: C.white, borderRadius: "4px", fontWeight: 700, fontSize: "1rem", textDecoration: "none" },
+
+  spinner: { padding: "3rem 1rem", textAlign: "center", color: C.text3, fontSize: "0.95rem" },
+  errorBox: { background: "#fff0f0", border: "1px solid #f8c4c4", borderRadius: "8px", padding: "0.85rem 1.1rem", color: C.red, fontSize: "0.9rem", marginBottom: "0.75rem" },
+};
+
+function DriverPill({ driver }) {
+  const d = DRIVER_CONFIG[driver] || DRIVER_CONFIG.skills_match;
   return (
-    <span style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}`, borderRadius: "4px", padding: "0.12rem 0.45rem", fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.03em", display: "inline-block" }}>
-      {c.label}
+    <span style={{ ...S.driverPill, background: d.bg, color: d.color, border: `1px solid ${d.border}` }}>
+      {d.label}
     </span>
   );
 }
 
-// ─── Job Card ─────────────────────────────────────────────────────────────────
-function JobCard({ job, onTrack, onApply }) {
+function JobCard({ job, selected, onSelect }) {
   const pct = Math.round(job.match_score * 100);
   const skills = job.required_skills ? job.required_skills.split(";").map((s) => s.trim()).filter(Boolean) : [];
+  const initial = (job.company || "?")[0].toUpperCase();
 
   return (
     <div
-      style={S.card}
-      onClick={() => onTrack(job.job_id)}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#475569"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.3)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.boxShadow = "none"; }}
+      style={{ ...S.jobCard, ...(selected ? S.jobCardActive : {}) }}
+      onClick={() => onSelect(job)}
+      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; }}
+      onMouseLeave={(e) => { if (!selected) e.currentTarget.style.boxShadow = "none"; }}
     >
-      <DriverBadge driver={job.recommendation_driver || "skills_match"} />
-      <div style={S.cardTop}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={S.jobTitle}>{job.job_title}</p>
-          <p style={S.company}>{job.company}</p>
-          <p style={S.location}>{job.location}</p>
+      <div style={S.cardRow}>
+        <div style={S.companyInitial}>{initial}</div>
+        <div style={S.cardMeta}>
+          <p style={S.jTitle}>{job.job_title}</p>
+          <p style={S.jCompany}>{job.company}</p>
+          <p style={S.jLocation}>{job.location}</p>
         </div>
-        <div style={S.scoreBox}>
-          <p style={S.scoreLabel}>Match</p>
-          <p style={S.scoreValue}>{pct}%</p>
-          <div style={S.progressTrack}><div style={S.progressBar(pct)} /></div>
+        <div style={S.matchCol}>
+          <div style={S.matchPct}>{pct}%</div>
+          <div style={S.matchSub}>match</div>
         </div>
       </div>
       {job.recommendation_reason && (
-        <p style={S.reasonLine}>{job.recommendation_reason}</p>
+        <p style={S.cardSnippet}>{job.recommendation_reason}</p>
       )}
-      <div style={S.divider} />
-      <div style={S.skillsRow}>
-        {skills.slice(0, 4).map((skill) => <span key={skill} style={S.skillChip}>{skill}</span>)}
-        {skills.length > 4 && <span style={S.skillChip}>+{skills.length - 4}</span>}
+      <div style={S.cardBottom}>
+        <DriverPill driver={job.recommendation_driver || "skills_match"} />
+        <div style={S.skillsRow}>
+          {skills.slice(0, 3).map((sk) => <span key={sk} style={S.skillChip}>{sk}</span>)}
+          {skills.length > 3 && <span style={S.skillChip}>+{skills.length - 3}</span>}
+        </div>
       </div>
-      <button
-        style={S.applyBtn}
-        onClick={(e) => { e.stopPropagation(); onApply(job); }}
-      >
+    </div>
+  );
+}
+
+function JobDetailPanel({ job, onApply }) {
+  if (!job) {
+    return (
+      <div style={S.emptyPanel}>
+        <div style={S.emptyIcon}>🔍</div>
+        <p style={S.emptyTitle}>Select a job to view details</p>
+        <p style={S.emptyHint}>Click any job on the left to see full information</p>
+      </div>
+    );
+  }
+
+  const pct = Math.round(job.match_score * 100);
+  const skills = job.required_skills ? job.required_skills.split(";").map((s) => s.trim()).filter(Boolean) : [];
+  const driver = DRIVER_CONFIG[job.recommendation_driver] || DRIVER_CONFIG.skills_match;
+
+  return (
+    <div style={S.detailPanel}>
+      <h1 style={S.dTitle}>{job.job_title}</h1>
+      <p style={S.dCompany}>{job.company}</p>
+      <p style={S.dLocation}>{job.location}</p>
+
+      <div style={S.dMatchRow}>
+        <div>
+          <div style={S.dMatchNum}>{pct}%</div>
+          <div style={S.dMatchLabel}>match score</div>
+        </div>
+        <DriverPill driver={job.recommendation_driver || "skills_match"} />
+      </div>
+
+      <button style={S.applyBtn} onClick={() => onApply(job)}>
         Apply on LinkedIn
       </button>
-    </div>
-  );
-}
 
-// ─── Profile Summary Card ─────────────────────────────────────────────────────
-function ProfileSummaryCard({ profile, count, alpha, beta }) {
-  const skills = profile?.skills ? profile.skills.split(";").map((s) => s.trim()).filter(Boolean) : [];
-  const topSkills = skills.slice(0, 5);
-  const cbfPct = Math.round(alpha * 100);
-  const cfPct = Math.round(beta * 100);
+      <hr style={S.hr} />
 
-  return (
-    <div style={S.profileCard}>
-      <div style={S.profileCardHeader}>
-        <div style={S.avatarCircle}>{(profile?.username || "U")[0].toUpperCase()}</div>
-        <div style={{ flex: 1 }}>
-          <div style={S.profileName}>{profile?.username}</div>
-          {profile?.current_title && <div style={S.profileTitle}>{profile.current_title}</div>}
-        </div>
-        <div style={S.profileStats}>
-          <div style={S.statNum}>{count}</div>
-          <div style={S.statLabel}>matches found</div>
-        </div>
-      </div>
-      {topSkills.length > 0 && (
-        <div style={{ ...S.skillsRow, marginTop: "0.85rem" }}>
-          {topSkills.map((s) => <span key={s} style={S.profileSkillChip}>{s}</span>)}
-        </div>
+      {job.recommendation_reason && (
+        <>
+          <p style={S.sectionTitle}>Why this job?</p>
+          <p style={S.sectionText}>{job.recommendation_reason}</p>
+        </>
       )}
-      <div style={S.weightBarWrap}>
-        <div style={S.weightBarLabels}>
-          <span style={{ color: "#38bdf8", fontSize: "0.73rem" }}>Skills Matching {cbfPct}%</span>
-          <span style={{ color: "#a78bfa", fontSize: "0.73rem" }}>Community Matching {cfPct}%</span>
-        </div>
-        <div style={S.weightBarTrack}>
-          <div style={{ height: "100%", width: `${cbfPct}%`, background: "#38bdf8", borderRadius: cbfPct === 100 ? "99px" : "99px 0 0 99px", transition: "width 0.5s ease" }} />
-          <div style={{ height: "100%", width: `${cfPct}%`, background: "#a78bfa", borderRadius: cfPct === 100 ? "99px" : "0 99px 99px 0", transition: "width 0.5s ease" }} />
-        </div>
-      </div>
-    </div>
-  );
-}
 
-// ─── Legend ───────────────────────────────────────────────────────────────────
-function Legend() {
-  return (
-    <div style={S.legend}>
-      {Object.entries(DRIVER_CONFIG).map(([key, c]) => (
-        <div key={key} style={S.legendItem}>
-          <span style={{ width: "10px", height: "10px", borderRadius: "3px", background: c.bg, border: `1px solid ${c.border}`, display: "inline-block", flexShrink: 0 }} />
-          <span style={{ color: c.color, fontWeight: 600 }}>{c.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ─── How This Works ───────────────────────────────────────────────────────────
-function HowItWorks() {
-  const [open, setOpen] = useState(false);
-  return (
-    <div style={S.howItWorks}>
-      <button style={S.howItWorksToggle} onClick={() => setOpen((v) => !v)}>
-        How this works {open ? "▲" : "▼"}
-      </button>
-      {open && (
-        <div style={S.howItWorksBody}>
-          <p style={S.howItWorksLine}><strong style={{ color: "#0ea5e9" }}>Skills Match</strong> — The system compared your profile skills and title to job requirements.</p>
-          <p style={S.howItWorksLine}><strong style={{ color: "#22c55e" }}>People Like You</strong> — The system found users with similar backgrounds and recommended jobs they engaged with.</p>
-          <p style={S.howItWorksLine}><strong style={{ color: "#a78bfa" }}>Best of Both</strong> — Both your skills profile and community signals were used together.</p>
-        </div>
+      {skills.length > 0 && (
+        <>
+          <p style={S.sectionTitle}>Required Skills</p>
+          <div style={{ ...S.skillsRow, marginTop: "0.4rem" }}>
+            {skills.map((sk) => (
+              <span key={sk} style={{ ...S.skillChip, fontSize: "0.82rem", padding: "0.22rem 0.6rem" }}>{sk}</span>
+            ))}
+          </div>
+        </>
       )}
+
+      <p style={S.sectionTitle}>How you were matched</p>
+      <p style={{ ...S.sectionText, color: driver.color, fontWeight: 600, marginBottom: "0.3rem" }}>{driver.label}</p>
+      <p style={S.sectionText}>
+        {job.recommendation_driver === "skills_match" && "Matched based on your profile skills and job title."}
+        {job.recommendation_driver === "people_like_you" && "Recommended because users with similar backgrounds engaged with this role."}
+        {job.recommendation_driver === "best_of_both" && "Both your skills profile and community signals contributed to this match."}
+      </p>
     </div>
   );
 }
 
-// ─── Results Section ──────────────────────────────────────────────────────────
-function ResultsSection({ title, jobs, onTrack, onApply }) {
-  if (!jobs.length) return null;
-  return (
-    <>
-      <div style={S.sectionHeader}>
-        <span style={S.sectionTitle}>{title}</span>
-        <span style={S.sectionCount}>{jobs.length} job{jobs.length !== 1 ? "s" : ""}</span>
-      </div>
-      <div style={S.grid}>
-        {jobs.map((job) => (
-          <JobCard key={job.job_id} job={job} onTrack={onTrack} onApply={onApply} />
-        ))}
-      </div>
-    </>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function RecommendationsPage() {
-  const [userId, setUserId] = useState("U001");
+  const [titleSearch, setTitleSearch] = useState("");
   const [n, setN] = useState(10);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedJob, setSelectedJob] = useState(null);
   const navigate = useNavigate();
   const isLoggedIn = !!localStorage.getItem("access_token");
 
   const fetchRecommendations = useCallback(async () => {
-    setLoading(true); setError(null); setData(null);
+    setLoading(true); setError(null); setData(null); setSelectedJob(null);
     try {
-      const params = isLoggedIn ? `?n=${n}` : `?user_id=${encodeURIComponent(userId.trim())}&n=${n}`;
-      const { data: json } = await api.get(`/recommendations/${params}`);
+      const { data: json } = await api.get(`/recommendations/?n=${n}`);
       setData(json);
+      if (json.recommendations?.length > 0) setSelectedJob(json.recommendations[0]);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
-  }, [userId, n, isLoggedIn]);
+  }, [n]);
 
   const trackInteraction = useCallback(async (jobId) => {
-    if (!isLoggedIn) return;
     const token = localStorage.getItem("access_token");
+    if (!token) return;
     try {
       await api.post(
         "/jobs/interact/",
@@ -262,7 +242,7 @@ export default function RecommendationsPage() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
     } catch {}
-  }, [isLoggedIn]);
+  }, []);
 
   const handleApply = useCallback((job) => {
     trackInteraction(job.job_id);
@@ -270,145 +250,151 @@ export default function RecommendationsPage() {
     window.open(`https://www.linkedin.com/jobs/search/?${params.toString()}`, "_blank");
   }, [trackInteraction]);
 
+  const handleSelectJob = useCallback((job) => {
+    setSelectedJob(job);
+    trackInteraction(job.job_id);
+  }, [trackInteraction]);
+
   const handleLogout = async () => {
     try { await api.post("/auth/logout/", { refresh: localStorage.getItem("refresh_token") }); } catch {}
-    localStorage.removeItem("access_token"); localStorage.removeItem("refresh_token");
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
     navigate("/login");
   };
 
   const profile = data?.profile || null;
-  const topSkills = profile?.skills ? profile.skills.split(";").map((s) => s.trim()).filter(Boolean).slice(0, 3) : [];
+  const allJobs = data?.recommendations || [];
 
-  const profileJobs = data?.recommendations?.filter((j) => j.recommendation_driver === "skills_match" || j.recommendation_driver === "best_of_both") || [];
-  const communityJobs = data?.recommendations?.filter((j) => j.recommendation_driver === "people_like_you") || [];
-  const hasBothSections = profileJobs.length > 0 && communityJobs.length > 0;
+  const displayedJobs = useMemo(() => {
+    if (!titleSearch.trim()) return allJobs;
+    const q = titleSearch.trim().toLowerCase();
+    return allJobs.filter((j) =>
+      j.job_title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q)
+    );
+  }, [allJobs, titleSearch]);
+
+  if (!isLoggedIn) {
+    return (
+      <div style={{ ...S.page, display: "flex", flexDirection: "column" }}>
+        <header style={S.header}>
+          <div style={S.headerInner}>
+            <Link to="/" style={S.logo}>Skai</Link>
+            <div style={S.navBtns}>
+              <Link to="/login" style={S.navLink}>Sign in</Link>
+              <Link to="/register" style={S.navLinkFill}>Create account</Link>
+            </div>
+          </div>
+        </header>
+        <div style={S.loginPrompt}>
+          <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>💼</div>
+          <p style={S.loginPromptTitle}>Sign in to see your job matches</p>
+          <p style={S.loginPromptText}>
+            Skai recommends jobs based on your skills and what professionals like you are applying to.
+          </p>
+          <Link to="/login" style={S.loginPromptBtn}>Sign in</Link>
+          <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: C.text3 }}>
+            No account? <Link to="/register" style={{ color: C.blue }}>Create one</Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={S.page}>
-      <div style={S.container}>
+      <header style={S.header}>
+        <div style={S.headerInner}>
+          <Link to="/" style={S.logo}>Skai</Link>
 
-        {/* Nav */}
-        <div style={S.nav}>
-          <div>
-            <div style={S.logo}>Skai</div>
+          <div style={S.searchGroup}>
+            <input
+              style={S.searchInput}
+              type="text"
+              placeholder="Search by job title or company"
+              value={titleSearch}
+              onChange={(e) => setTitleSearch(e.target.value)}
+            />
+            <div style={S.searchDivider} />
+            <input
+              style={S.nInput}
+              type="number"
+              min={1}
+              max={50}
+              value={n}
+              onChange={(e) => setN(Number(e.target.value))}
+              title="Number of recommendations"
+            />
+            <button style={S.findBtn} onClick={fetchRecommendations} disabled={loading}>
+              {loading ? "…" : "Find Jobs"}
+            </button>
           </div>
-          <div style={S.navRight}>
-            {isLoggedIn ? (
-              <>
-                <Link to="/profile" style={S.navBtn}>Profile</Link>
-                <button style={S.navBtn} onClick={handleLogout}>Logout</button>
-              </>
+
+          <div style={S.navBtns}>
+            <Link to="/profile" style={S.navLink}>Profile</Link>
+            <button style={S.navLinkFill} onClick={handleLogout}>Sign out</button>
+          </div>
+        </div>
+      </header>
+
+      {profile && (
+        <div style={S.profileBanner}>
+          <div style={S.profileBannerInner}>
+            <div style={S.avatarXs}>{(profile.username || "U")[0].toUpperCase()}</div>
+            <span>
+              <strong>{profile.username}</strong>
+              {profile.current_title && ` · ${profile.current_title}`}
+              {data && ` · ${data.count} job${data.count !== 1 ? "s" : ""} found`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ maxWidth: "1200px", margin: "1rem auto", padding: "0 1.5rem" }}>
+          <div style={S.errorBox}>Error: {error}</div>
+        </div>
+      )}
+
+      <div style={S.main}>
+        <div style={S.leftCol}>
+          {!data && !loading && !error && (
+            <div style={S.emptyPanel}>
+              <div style={S.emptyIcon}>💼</div>
+              <p style={S.emptyTitle}>Click Find Jobs to see your personalised matches</p>
+              <p style={S.emptyHint}>Recommendations are based on your skills and community activity</p>
+            </div>
+          )}
+
+          {loading && <div style={S.spinner}>Finding your best matches…</div>}
+
+          {data && !loading && (
+            displayedJobs.length === 0 ? (
+              <div style={{ ...S.emptyPanel, padding: "2rem" }}>
+                <p style={S.emptyTitle}>No jobs match "{titleSearch}"</p>
+                <p style={S.emptyHint}>Try a different search term</p>
+              </div>
             ) : (
               <>
-                <Link to="/login" style={S.navBtn}>Login</Link>
-                <Link to="/register" style={S.navBtn}>Register</Link>
+                <p style={S.resultsCount}>
+                  {displayedJobs.length} job{displayedJobs.length !== 1 ? "s" : ""}
+                  {titleSearch.trim() && ` matching "${titleSearch.trim()}"`}
+                </p>
+                {displayedJobs.map((job) => (
+                  <JobCard
+                    key={job.job_id}
+                    job={job}
+                    selected={selectedJob?.job_id === job.job_id}
+                    onSelect={handleSelectJob}
+                  />
+                ))}
               </>
-            )}
-          </div>
-        </div>
-
-        {/* Personalised header */}
-        {isLoggedIn && profile && (
-          <div style={S.personalizedHeader}>
-            <h1 style={S.headerTitle}>Recommended for You, {profile.username}</h1>
-            {(profile.current_title || topSkills.length > 0) && (
-              <p style={S.headerSubtitle}>
-                {profile.current_title}
-                {profile.current_title && topSkills.length > 0 ? " · " : ""}
-                {topSkills.join(", ")}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Profile Summary Card */}
-        {isLoggedIn && data && profile && (
-          <ProfileSummaryCard
-            profile={profile}
-            count={data.count}
-            alpha={data.weights.alpha}
-            beta={data.weights.beta}
-          />
-        )}
-
-        {/* Legend */}
-        {data && <Legend />}
-
-        {/* How this works */}
-        <HowItWorks />
-
-        {/* Search controls */}
-        <div style={S.searchBar}>
-          {!isLoggedIn && (
-            <input
-              style={S.input}
-              type="text"
-              placeholder="User ID  e.g. U001"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchRecommendations()}
-            />
+            )
           )}
-          <input
-            style={S.nInput}
-            type="number"
-            min={1}
-            max={50}
-            value={n}
-            onChange={(e) => setN(Number(e.target.value))}
-            title="Number of recommendations"
-          />
-          <button style={S.button} onClick={fetchRecommendations} disabled={loading}>
-            {loading ? "Loading…" : "Recommend"}
-          </button>
         </div>
 
-        {error && <div style={S.error}>Error: {error}</div>}
-        {loading && <div style={S.spinner}>Generating recommendations…</div>}
-
-        {/* Results */}
-        {data && !loading && (
-          data.recommendations.length === 0
-            ? <div style={S.emptyState}><p>No recommendations found.</p></div>
-            : hasBothSections
-              ? (
-                <>
-                  <ResultsSection
-                    title="Based on your profile"
-                    jobs={profileJobs}
-                    onTrack={trackInteraction}
-                    onApply={handleApply}
-                  />
-                  <div style={S.sectionDivider}>
-                    <div style={S.sectionDividerLine} />
-                    <span style={S.sectionDividerText}>Based on people like you</span>
-                    <div style={S.sectionDividerLine} />
-                  </div>
-                  <ResultsSection
-                    title=""
-                    jobs={communityJobs}
-                    onTrack={trackInteraction}
-                    onApply={handleApply}
-                  />
-                </>
-              )
-              : (
-                <ResultsSection
-                  title={communityJobs.length > 0 ? "Based on people like you" : "Based on your profile"}
-                  jobs={[...profileJobs, ...communityJobs]}
-                  onTrack={trackInteraction}
-                  onApply={handleApply}
-                />
-              )
-        )}
-
-        {!data && !loading && !error && (
-          <div style={S.emptyState}>
-            <p style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🔍</p>
-            <p>{isLoggedIn ? "Click Recommend to see your personalised jobs." : "Enter a User ID and click Recommend to get started."}</p>
-            {!isLoggedIn && <p style={{ fontSize: "0.8rem", marginTop: "0.5rem" }}>Sample IDs: U001 – U500</p>}
-          </div>
-        )}
+        <div style={S.rightCol}>
+          <JobDetailPanel job={selectedJob} onApply={handleApply} />
+        </div>
       </div>
     </div>
   );
