@@ -1,4 +1,5 @@
 import React from "react";
+import "./responsive.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import RecommendationsPage from "./pages/RecommendationsPage";
 import LoginPage from "./pages/LoginPage";

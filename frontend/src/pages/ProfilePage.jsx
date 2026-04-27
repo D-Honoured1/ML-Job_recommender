@@ -107,16 +107,16 @@ export default function ProfilePage() {
         <div style={S.headerInner}>
           <Link to="/" style={S.logo}>HJR System</Link>
           <div style={S.headerRight}>
-            <Link to="/" style={S.navLink}>Find Jobs</Link>
-            <button style={S.navLinkBlue} onClick={handleLogout}>Sign out</button>
+            <Link to="/" style={S.navLink} className="profile-nav-link">Find Jobs</Link>
+            <button style={S.navLinkBlue} className="profile-nav-btn" onClick={handleLogout}>Sign out</button>
           </div>
         </div>
       </header>
 
-      <div style={S.main}>
+      <div style={S.main} className="profile-main">
         {/* Profile card */}
-        <div style={S.card}>
-          <div style={S.profileHeader}>
+        <div style={S.card} className="profile-card">
+          <div style={S.profileHeader} className="profile-header">
             <div style={S.avatar}>{(profile.username || "U")[0].toUpperCase()}</div>
             <div>
               <p style={S.profileName}>{profile.username}</p>
@@ -143,7 +143,7 @@ export default function ProfilePage() {
               <label style={S.label}>Years of Experience</label>
               <input style={S.input} name="experience_years" type="number" min="0" value={form.experience_years || ""} onChange={handleChange} onFocus={focusBlue} onBlur={blurGray} />
 
-              <div style={S.btnRow}>
+              <div style={S.btnRow} className="profile-btn-row">
                 <button style={S.btn} onClick={handleSave} disabled={loading}>{loading ? "Saving…" : "Save changes"}</button>
                 <button style={S.outlineBtn} onClick={() => setEditing(false)}>Cancel</button>
               </div>
@@ -167,7 +167,7 @@ export default function ProfilePage() {
                 }
               </div>
 
-              <div style={S.btnRow}>
+              <div style={S.btnRow} className="profile-btn-row">
                 <button style={S.btn} onClick={() => setEditing(true)}>Edit profile</button>
               </div>
             </>
@@ -175,7 +175,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Resume card */}
-        <div style={S.card}>
+        <div style={S.card} className="profile-card">
           <h2 style={S.cardTitle}>Resume</h2>
           <p style={{ fontSize: "0.88rem", color: C.text2, marginBottom: "1rem" }}>
             Upload a PDF resume to automatically extract your skills.

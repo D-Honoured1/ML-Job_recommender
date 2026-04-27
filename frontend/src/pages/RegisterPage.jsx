@@ -83,16 +83,16 @@ export default function RegisterPage() {
   };
 
   return (
-    <div style={S.page}>
-      <Link to="/" style={S.logo}>HJR System</Link>
-      <div style={S.card}>
+    <div style={S.page} className="register-page">
+      <Link to="/" style={S.logo} className="register-logo">HJR System</Link>
+      <div style={S.card} className="register-card">
         <Link to="/" style={S.backLink}>← Back to jobs</Link>
         <h1 style={S.heading}>Create your account</h1>
 
         {error && <div style={S.error}>{error}</div>}
         {resumeSkills && <div style={S.success}>Extracted {resumeSkills.length} skills from your resume!</div>}
 
-        <button style={S.outlineBtn} onClick={() => setResumeMode(!resumeMode)}>
+        <button style={S.outlineBtn} className="register-outline-btn" onClick={() => setResumeMode(!resumeMode)}>
           {resumeMode ? "Fill in manually instead" : "📄 Upload Resume PDF"}
         </button>
 
@@ -131,7 +131,7 @@ export default function RegisterPage() {
             </>
           )}
 
-          <button style={S.btn} disabled={loading}>
+          <button style={S.btn} className="register-btn" disabled={loading}>
             {loading ? "Creating account…" : "Create Account"}
           </button>
         </form>

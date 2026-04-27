@@ -1,0 +1,78 @@
+/* =============================================
+   HJR System — Mobile Responsive Overrides
+   Breakpoint: 768px
+   ============================================= */
+
+/* ── RecommendationsPage: Header ── */
+@media (max-width: 768px) {
+  .rec-header-inner { flex-wrap: wrap; gap: 0.5rem; }
+  .rec-logo         { font-size: 1.3rem !important; }
+  .rec-search-group { order: 3; flex: 1 1 100%; max-width: 100% !important; }
+  .rec-nav-btns     { margin-left: auto; }
+}
+
+/* ── RecommendationsPage: Two-column → stacked list/detail ── */
+@media (max-width: 768px) {
+  .rec-main     { flex-direction: column; padding: 0.75rem !important; gap: 0; }
+  .rec-left-col { width: 100%; flex: none; }
+  .rec-left-col.hidden { display: none; }
+
+  .rec-right-col {
+    display: none;
+    position: static !important;
+    top: auto !important;
+    max-height: none !important;
+    overflow-y: visible !important;
+    width: 100%;
+    flex: none;
+  }
+  .rec-right-col.show { display: block; }
+
+  .rec-empty-panel { padding: 2rem 1rem !important; }
+}
+
+/* ── Back button: hidden on desktop, shown on mobile ── */
+.rec-back-btn { display: none; }
+@media (max-width: 768px) {
+  .rec-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: none;
+    border: none;
+    color: #2557a7;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.6rem 0;
+    margin-bottom: 0.75rem;
+  }
+}
+
+/* ── LoginPage ── */
+@media (max-width: 768px) {
+  .login-page { padding: 1rem !important; }
+  .login-logo { font-size: 1.5rem !important; }
+  .login-card { padding: 1.25rem !important; }
+  .login-btn  { min-height: 44px; }
+}
+
+/* ── RegisterPage ── */
+@media (max-width: 768px) {
+  .register-page        { padding: 1rem !important; }
+  .register-logo        { font-size: 1.5rem !important; }
+  .register-card        { padding: 1.25rem !important; }
+  .register-btn         { min-height: 44px; }
+  .register-outline-btn { min-height: 44px; }
+}
+
+/* ── ProfilePage ── */
+@media (max-width: 768px) {
+  .profile-main    { margin-top: 1rem !important; padding: 0 0.75rem !important; }
+  .profile-card    { padding: 1.25rem !important; }
+  .profile-header  { flex-direction: column !important; align-items: flex-start !important; }
+  .profile-nav-link,
+  .profile-nav-btn { padding: 0.6rem 0.9rem !important; font-size: 0.9rem !important; }
+  .profile-btn-row { flex-direction: column !important; }
+  .profile-btn-row button { width: 100%; min-height: 44px; }
+}

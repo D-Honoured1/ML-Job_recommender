@@ -44,9 +44,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={S.page}>
-      <Link to="/" style={S.logo}>HJR System</Link>
-      <div style={S.card}>
+    <div style={S.page} className="login-page">
+      <Link to="/" style={S.logo} className="login-logo">HJR System</Link>
+      <div style={S.card} className="login-card">
         <Link to="/" style={S.backLink}>← Back to jobs</Link>
         <h1 style={S.heading}>Sign in to your account</h1>
 
@@ -75,7 +75,7 @@ export default function LoginPage() {
             onFocus={(e) => (e.target.style.borderColor = C.blue)}
             onBlur={(e) => (e.target.style.borderColor = C.border)}
           />
-          <button style={S.btn} disabled={loading}>
+          <button style={S.btn} className="login-btn" disabled={loading}>
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>

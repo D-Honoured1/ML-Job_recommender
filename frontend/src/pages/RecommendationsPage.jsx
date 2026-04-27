@@ -145,10 +145,10 @@ function JobCard({ job, selected, onSelect }) {
   );
 }
 
-function JobDetailPanel({ job, onApply }) {
+function JobDetailPanel({ job, onApply, onBack }) {
   if (!job) {
     return (
-      <div style={S.emptyPanel}>
+      <div style={S.emptyPanel} className="rec-empty-panel">
         <div style={S.emptyIcon}>🔍</div>
         <p style={S.emptyTitle}>Select a job to view details</p>
         <p style={S.emptyHint}>Click any job on the left to see full information</p>
@@ -162,6 +162,7 @@ function JobDetailPanel({ job, onApply }) {
 
   return (
     <div style={S.detailPanel}>
+      <button className="rec-back-btn" onClick={onBack}>← Back to results</button>
       <h1 style={S.dTitle}>{job.job_title}</h1>
       <p style={S.dCompany}>{job.company}</p>
       <p style={S.dLocation}>{job.location}</p>
@@ -216,11 +217,12 @@ export default function RecommendationsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [mobileView, setMobileView] = useState("list");
   const navigate = useNavigate();
   const isLoggedIn = !!localStorage.getItem("access_token");
 
   const fetchRecommendations = useCallback(async () => {
-    setLoading(true); setError(null); setData(null); setSelectedJob(null);
+    setLoading(true); setError(null); setData(null); setSelectedJob(null); setMobileView("list");
     try {
       const { data: json } = await api.get(`/recommendations/?n=${n}`);
       setData(json);
@@ -253,6 +255,7 @@ export default function RecommendationsPage() {
   const handleSelectJob = useCallback((job) => {
     setSelectedJob(job);
     trackInteraction(job.job_id);
+    setMobileView("detail");
   }, [trackInteraction]);
 
   const handleLogout = async () => {
@@ -277,9 +280,9 @@ export default function RecommendationsPage() {
     return (
       <div style={{ ...S.page, display: "flex", flexDirection: "column" }}>
         <header style={S.header}>
-          <div style={S.headerInner}>
-            <Link to="/" style={S.logo}>HJR System</Link>
-            <div style={S.navBtns}>
+          <div style={S.headerInner} className="rec-header-inner">
+            <Link to="/" style={S.logo} className="rec-logo">HJR System</Link>
+            <div style={S.navBtns} className="rec-nav-btns">
               <Link to="/login" style={S.navLink}>Sign in</Link>
               <Link to="/register" style={S.navLinkFill}>Create account</Link>
             </div>
@@ -303,10 +306,10 @@ export default function RecommendationsPage() {
   return (
     <div style={S.page}>
       <header style={S.header}>
-        <div style={S.headerInner}>
-          <Link to="/" style={S.logo}>HJR System</Link>
+        <div style={S.headerInner} className="rec-header-inner">
+          <Link to="/" style={S.logo} className="rec-logo">HJR System</Link>
 
-          <div style={S.searchGroup}>
+          <div style={S.searchGroup} className="rec-search-group">
             <input
               style={S.searchInput}
               type="text"
@@ -329,7 +332,7 @@ export default function RecommendationsPage() {
             </button>
           </div>
 
-          <div style={S.navBtns}>
+          <div style={S.navBtns} className="rec-nav-btns">
             <Link to="/profile" style={S.navLink}>Profile</Link>
             <button style={S.navLinkFill} onClick={handleLogout}>Sign out</button>
           </div>
@@ -355,10 +358,10 @@ export default function RecommendationsPage() {
         </div>
       )}
 
-      <div style={S.main}>
-        <div style={S.leftCol}>
+      <div style={S.main} className="rec-main">
+        <div style={S.leftCol} className={`rec-left-col${mobileView === "detail" ? " hidden" : ""}`}>
           {!data && !loading && !error && (
-            <div style={S.emptyPanel}>
+            <div style={S.emptyPanel} className="rec-empty-panel">
               <div style={S.emptyIcon}>💼</div>
               <p style={S.emptyTitle}>Click Find Jobs to see your personalised matches</p>
               <p style={S.emptyHint}>Recommendations are based on your skills and community activity</p>
@@ -392,8 +395,8 @@ export default function RecommendationsPage() {
           )}
         </div>
 
-        <div style={S.rightCol}>
-          <JobDetailPanel job={selectedJob} onApply={handleApply} />
+        <div style={S.rightCol} className={`rec-right-col${mobileView === "detail" ? " show" : ""}`}>
+          <JobDetailPanel job={selectedJob} onApply={handleApply} onBack={() => setMobileView("list")} />
         </div>
       </div>
     </div>
