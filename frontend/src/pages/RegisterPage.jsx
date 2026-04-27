@@ -84,7 +84,7 @@ export default function RegisterPage() {
 
   return (
     <div style={S.page}>
-      <Link to="/" style={S.logo}>Skai</Link>
+      <Link to="/" style={S.logo}>HJR System</Link>
       <div style={S.card}>
         <Link to="/" style={S.backLink}>← Back to jobs</Link>
         <h1 style={S.heading}>Create your account</h1>

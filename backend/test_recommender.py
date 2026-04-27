@@ -1,5 +1,5 @@
 """
-Standalone test for the Skai Hybrid Recommender Engine.
+Standalone test for the HJR System Hybrid Recommender Engine.
 
 Run from project root:
     python backend/test_recommender.py

@@ -105,7 +105,7 @@ export default function ProfilePage() {
     <div style={S.page}>
       <header style={S.header}>
         <div style={S.headerInner}>
-          <Link to="/" style={S.logo}>Skai</Link>
+          <Link to="/" style={S.logo}>HJR System</Link>
           <div style={S.headerRight}>
             <Link to="/" style={S.navLink}>Find Jobs</Link>
             <button style={S.navLinkBlue} onClick={handleLogout}>Sign out</button>

@@ -45,7 +45,7 @@ export default function LoginPage() {
 
   return (
     <div style={S.page}>
-      <Link to="/" style={S.logo}>Skai</Link>
+      <Link to="/" style={S.logo}>HJR System</Link>
       <div style={S.card}>
         <Link to="/" style={S.backLink}>← Back to jobs</Link>
         <h1 style={S.heading}>Sign in to your account</h1>
