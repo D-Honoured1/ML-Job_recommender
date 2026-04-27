@@ -158,6 +158,7 @@ class HybridRecommender:
             cf_scores = self._cf_scores_for_db_user(db_user, user_id)
 
         user_skills = [s.strip() for s in str(user_row.get("skills", "")).split(";") if s.strip()]
+        user_skills_lower = {s.lower() for s in user_skills}
 
         all_job_ids = self._job_df.index.tolist()
         hybrid: list[tuple[str, float, float, float]] = []
@@ -183,16 +184,24 @@ class HybridRecommender:
             else:
                 cbf_pct, cf_pct = 1.0, 0.0
 
+            job_skills = [s.strip() for s in str(job.get("required_skills", "")).split(";") if s.strip()]
+            matched_skills = [s for s in job_skills if s.lower() in user_skills_lower]
+
             if cbf_pct > 0.7:
                 driver = "skills_match"
-                top = user_skills[:3]
-                reason = f"Matches your {', '.join(top)} skills" if top else "Matches your profile skills"
+                if matched_skills:
+                    reason = f"Your {', '.join(matched_skills[:3])} skills match this role"
+                else:
+                    reason = "Your profile is a strong fit for this role"
             elif cf_pct > 0.7:
                 driver = "people_like_you"
                 reason = "People with your background also applied to this"
             else:
                 driver = "best_of_both"
-                reason = "Strong skills match and popular with similar users"
+                if matched_skills:
+                    reason = f"Skills match ({', '.join(matched_skills[:2])}) and popular with similar users"
+                else:
+                    reason = "Strong profile fit and popular with similar users"
 
             results.append({
                 "job_id": job_id,
