@@ -190,6 +190,8 @@ class HybridRecommender:
                 "location": str(job.get("location", "")),
                 "required_skills": str(job.get("required_skills", "")),
                 "match_score": round(score, 4),
+                "cbf_pct": round(cbf_pct, 4),
+                "cf_pct": round(cf_pct, 4),
                 "apply_url": f"/jobs/{job_id}/apply",
                 "recommendation_driver": driver,
                 "recommendation_reason": reason,
@@ -210,14 +212,15 @@ class HybridRecommender:
             if matched:
                 reason = f"{n_matched} matching skill{'s' if n_matched > 1 else ''}: {shown}"
             elif job_skills:
-                reason = f"Your title and experience level suit this role"
+                # No exact profile skill matched — show what the role needs as context
+                reason = f"Role requires: {', '.join(job_skills[:3])}"
             else:
-                reason = "Profile and experience level match the role requirements"
+                reason = "Profile aligned with role by title and experience"
 
         elif cf_pct >= 0.7:
             driver = "people_like_you"
             if matched:
-                reason = f"Professionals with your {shown} background engaged with this role"
+                reason = f"Similar users applied — and your profile includes: {shown}"
             else:
                 reason = "Professionals with a similar background engaged with this role"
 

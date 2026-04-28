@@ -14,6 +14,8 @@ class JobRecommendationSerializer(serializers.Serializer):
     match_score = serializers.FloatField(
         help_text="Hybrid similarity score in [0, 1]"
     )
+    cbf_pct = serializers.FloatField(default=1.0, help_text="Fraction of score from content-based filtering")
+    cf_pct = serializers.FloatField(default=0.0, help_text="Fraction of score from collaborative filtering")
     apply_url = serializers.CharField()
     recommendation_driver = serializers.CharField(default="skills_match")
     recommendation_reason = serializers.CharField(default="")

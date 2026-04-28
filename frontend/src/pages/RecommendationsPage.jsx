@@ -15,9 +15,24 @@ const C = {
 };
 
 const DRIVER_CONFIG = {
-  skills_match:    { label: "Skills Match",    color: "#2557a7", bg: "#e8f0fe", border: "#b8d0f8" },
-  people_like_you: { label: "People Like You", color: "#007c5f", bg: "#e6f3ef", border: "#a8d4c8" },
-  best_of_both:    { label: "Best of Both",    color: "#7c3aed", bg: "#f3e8ff", border: "#c4b0f0" },
+  skills_match: {
+    label: "Skills Match",
+    fullName: "Content-Based Filtering",
+    color: "#2557a7", bg: "#e8f0fe", border: "#b8d0f8",
+    description: "Your skills and profile were compared to job requirements using TF-IDF similarity.",
+  },
+  people_like_you: {
+    label: "Collaborative",
+    fullName: "Collaborative Filtering",
+    color: "#007c5f", bg: "#e6f3ef", border: "#a8d4c8",
+    description: "Professionals with similar profiles engaged with this role — their behaviour informed this recommendation.",
+  },
+  best_of_both: {
+    label: "Hybrid",
+    fullName: "Hybrid Recommendation",
+    color: "#7c3aed", bg: "#f3e8ff", border: "#c4b0f0",
+    description: "Both skill-profile matching and community behaviour contributed to this recommendation.",
+  },
 };
 
 const S = {
@@ -101,8 +116,8 @@ const S = {
 function DriverPill({ driver }) {
   const d = DRIVER_CONFIG[driver] || DRIVER_CONFIG.skills_match;
   return (
-    <span style={{ ...S.driverPill, background: d.bg, color: d.color, border: `1px solid ${d.border}` }}>
-      {d.label}
+    <span style={{ ...S.driverPill, background: d.color, color: "#fff" }} title={d.description}>
+      {d.fullName}
     </span>
   );
 }
@@ -159,6 +174,8 @@ function JobDetailPanel({ job, onApply, onBack }) {
   const pct = Math.round(job.match_score * 100);
   const skills = job.required_skills ? job.required_skills.split(";").map((s) => s.trim()).filter(Boolean) : [];
   const driver = DRIVER_CONFIG[job.recommendation_driver] || DRIVER_CONFIG.skills_match;
+  const cbfPct = Math.round((job.cbf_pct ?? 1) * 100);
+  const cfPct  = Math.round((job.cf_pct  ?? 0) * 100);
 
   return (
     <div style={S.detailPanel}>
@@ -167,12 +184,46 @@ function JobDetailPanel({ job, onApply, onBack }) {
       <p style={S.dCompany}>{job.company}</p>
       <p style={S.dLocation}>{job.location}</p>
 
-      <div style={S.dMatchRow}>
-        <div>
-          <div style={S.dMatchNum}>{pct}%</div>
-          <div style={S.dMatchLabel}>match score</div>
+      {/* Algorithm + Score block */}
+      <div style={{ background: driver.bg, border: `1px solid ${driver.border}`, borderRadius: "8px", padding: "1rem", marginBottom: "1.25rem" }}>
+        {/* Algorithm label */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem" }}>
+          <span style={{ background: driver.color, color: "#fff", borderRadius: "4px", padding: "0.2rem 0.6rem", fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.04em" }}>
+            {driver.fullName.toUpperCase()}
+          </span>
         </div>
-        <DriverPill driver={job.recommendation_driver || "skills_match"} />
+        <p style={{ fontSize: "0.82rem", color: C.text2, margin: "0 0 0.85rem", lineHeight: 1.5 }}>{driver.description}</p>
+
+        {/* Score + breakdown */}
+        <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start" }}>
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <div style={{ fontSize: "2.2rem", fontWeight: 900, color: driver.color, lineHeight: 1 }}>{pct}%</div>
+            <div style={{ fontSize: "0.72rem", color: C.text3, marginTop: "0.2rem" }}>match score</div>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "0.75rem", color: C.text3, marginBottom: "0.4rem", fontWeight: 600 }}>SCORE BREAKDOWN</div>
+            {/* CBF bar */}
+            <div style={{ marginBottom: "0.35rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "0.2rem" }}>
+                <span style={{ color: "#2557a7", fontWeight: 600 }}>Content-Based</span>
+                <span style={{ color: C.text3 }}>{cbfPct}%</span>
+              </div>
+              <div style={{ height: "7px", background: "rgba(0,0,0,0.08)", borderRadius: "4px", overflow: "hidden" }}>
+                <div style={{ width: `${cbfPct}%`, height: "100%", background: "#2557a7", borderRadius: "4px", transition: "width 0.5s ease" }} />
+              </div>
+            </div>
+            {/* CF bar */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", marginBottom: "0.2rem" }}>
+                <span style={{ color: "#007c5f", fontWeight: 600 }}>Collaborative</span>
+                <span style={{ color: C.text3 }}>{cfPct}%</span>
+              </div>
+              <div style={{ height: "7px", background: "rgba(0,0,0,0.08)", borderRadius: "4px", overflow: "hidden" }}>
+                <div style={{ width: `${cfPct}%`, height: "100%", background: "#007c5f", borderRadius: "4px", transition: "width 0.5s ease" }} />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <button style={S.applyBtn} onClick={() => onApply(job)}>
@@ -198,14 +249,6 @@ function JobDetailPanel({ job, onApply, onBack }) {
           </div>
         </>
       )}
-
-      <p style={S.sectionTitle}>How you were matched</p>
-      <p style={{ ...S.sectionText, color: driver.color, fontWeight: 600, marginBottom: "0.3rem" }}>{driver.label}</p>
-      <p style={S.sectionText}>
-        {job.recommendation_driver === "skills_match" && "Matched based on your profile skills and job title."}
-        {job.recommendation_driver === "people_like_you" && "Recommended because users with similar backgrounds engaged with this role."}
-        {job.recommendation_driver === "best_of_both" && "Both your skills profile and community signals contributed to this match."}
-      </p>
     </div>
   );
 }
@@ -279,7 +322,7 @@ export default function RecommendationsPage() {
   if (!isLoggedIn) {
     return (
       <div style={{ ...S.page, display: "flex", flexDirection: "column" }}>
-        <header style={S.header}>
+        <header style={S.header} className="rec-header">
           <div style={S.headerInner} className="rec-header-inner">
             <Link to="/" style={S.logo} className="rec-logo">HJR System</Link>
             <div style={S.navBtns} className="rec-nav-btns">
@@ -305,7 +348,7 @@ export default function RecommendationsPage() {
 
   return (
     <div style={S.page}>
-      <header style={S.header}>
+      <header style={S.header} className="rec-header">
         <div style={S.headerInner} className="rec-header-inner">
           <Link to="/" style={S.logo} className="rec-logo">HJR System</Link>
 

@@ -5,16 +5,21 @@
 
 /* ── RecommendationsPage: Header ── */
 @media (max-width: 768px) {
-  .rec-header-inner { flex-wrap: wrap; gap: 0.5rem; }
-  .rec-logo         { font-size: 1.3rem !important; }
-  .rec-search-group { order: 3; flex: 1 1 100%; max-width: 100% !important; }
+  /* Tighten header padding so logo + nav have more room */
+  .rec-header { padding: 0.6rem 0.75rem !important; }
+  .rec-header-inner { flex-wrap: wrap; gap: 0.4rem; }
+  .rec-logo         { font-size: 1.25rem !important; }
+  /* Force search group onto its own full-width row.
+     Must use !important — inline flex: 1 (flex-basis: 0) would otherwise win. */
+  .rec-search-group { order: 3; flex: 0 0 100% !important; max-width: 100% !important; }
   .rec-nav-btns     { margin-left: auto; }
 }
 
 /* ── RecommendationsPage: Two-column → stacked list/detail ── */
 @media (max-width: 768px) {
-  .rec-main     { flex-direction: column; padding: 0.75rem !important; gap: 0; }
-  .rec-left-col { width: 100%; flex: none; }
+  .rec-main { flex-direction: column; padding: 0.75rem !important; gap: 0; }
+  /* Must use !important — inline flex: "0 0 44%" would otherwise win over flex: none. */
+  .rec-left-col { flex: 0 0 100% !important; width: 100%; min-width: 0; }
   .rec-left-col.hidden { display: none; }
 
   .rec-right-col {
