@@ -204,7 +204,7 @@ function JobCard({ job, selected, onSelect }) {
   );
 }
 
-function JobDetailPanel({ job, onApply, onBack }) {
+function JobDetailPanel({ job, weights, onApply, onBack }) {
   if (!job) {
     return (
       <div style={S.emptyPanel} className="rec-empty-panel">
@@ -219,8 +219,8 @@ function JobDetailPanel({ job, onApply, onBack }) {
   const pct = hasScore ? Math.round(job.match_score * 100) : null;
   const skills = job.required_skills ? job.required_skills.split(";").map((s) => s.trim()).filter(Boolean) : [];
   const driver = job.recommendation_driver ? (DRIVER_CONFIG[job.recommendation_driver] || DRIVER_CONFIG.skills_match) : null;
-  const cbfPct = Math.round((job.cbf_pct ?? 1) * 100);
-  const cfPct  = Math.round((job.cf_pct  ?? 0) * 100);
+  const cbfPct = Math.round((weights?.alpha ?? 1) * 100);
+  const cfPct  = Math.round((weights?.beta  ?? 0) * 100);
 
   return (
     <div style={S.detailPanel}>
@@ -369,6 +369,7 @@ export default function RecommendationsPage() {
     setLoading(true); setError(null); setData(null); setSelectedJob(null); setMobileView("list"); setVisibleCount(10);
     try {
       const { data: json } = await api.get("/recommendations/?n=50");
+      console.log("[Recommendations] weights from API:", json.weights);
       setData(json);
       if (json.recommendations?.length > 0) setSelectedJob(json.recommendations[0]);
     } catch (err) {
@@ -409,6 +410,7 @@ export default function RecommendationsPage() {
   const allRecommendations = data?.recommendations || [];
   const displayedJobs = isSearchMode ? fuseResults : allRecommendations.slice(0, visibleCount);
   const profile = data?.profile || null;
+  const weights = data?.weights || { alpha: 1, beta: 0 };
 
   const closeMenu = () => setMenuOpen(false);
 
@@ -575,7 +577,7 @@ export default function RecommendationsPage() {
 
         {/* Right column — detail panel */}
         <div style={S.rightCol} className={`rec-right-col${mobileView === "detail" ? " show" : ""}`}>
-          <JobDetailPanel job={selectedJob} onApply={handleApply} onBack={() => setMobileView("list")} />
+          <JobDetailPanel job={selectedJob} weights={weights} onApply={handleApply} onBack={() => setMobileView("list")} />
         </div>
       </div>
     </div>
