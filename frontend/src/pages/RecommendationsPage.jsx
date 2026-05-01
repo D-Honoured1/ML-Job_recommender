@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import Fuse from "fuse.js";
 import api from "../api";
 
@@ -315,12 +315,12 @@ export default function RecommendationsPage() {
   const menuRef = useRef(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const isLoggedIn = !!localStorage.getItem("access_token");
 
-  // Auto-fetch recommendations and catalogue on mount
+  // Load catalogue and unread count once — these don't need to reset on navigation
   useEffect(() => {
     if (!isLoggedIn) return;
-    fetchRecommendations();
     api.get("/jobs/search/")
       .then(({ data: catalogue }) => setJobCatalogue(catalogue))
       .catch(() => {});
@@ -328,6 +328,18 @@ export default function RecommendationsPage() {
       .then(({ data: notifs }) => setUnread(notifs.filter((n) => !n.is_read).length))
       .catch(() => {});
   }, []); // eslint-disable-line
+
+  // Reset search state and reload recommendations on every navigation to this page.
+  // location.key changes on every navigation event, including clicking the logo while
+  // already on "/" — so this handles both remount (coming from another page) and
+  // in-place navigation (clicking Home while already on the recommendations page).
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    setSearchQuery("");
+    setFuseResults([]);
+    setVisibleCount(10);
+    fetchRecommendations();
+  }, [location.key]); // eslint-disable-line
 
   // Run Fuse.js when search query changes
   useEffect(() => {
