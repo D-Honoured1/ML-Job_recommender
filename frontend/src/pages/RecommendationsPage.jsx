@@ -218,7 +218,7 @@ function JobDetailPanel({ job, weights, onApply, onBack }) {
   const hasScore = job.match_score != null && job.match_score > 0;
   const pct = hasScore ? Math.round(job.match_score * 100) : null;
   const skills = job.required_skills ? job.required_skills.split(";").map((s) => s.trim()).filter(Boolean) : [];
-  const driver = job.recommendation_driver ? (DRIVER_CONFIG[job.recommendation_driver] || DRIVER_CONFIG.skills_match) : null;
+  const driver = DRIVER_CONFIG[job.recommendation_driver] ?? null;
   const cbfPct = Math.round((weights?.alpha ?? 1) * 100);
   const cfPct  = Math.round((weights?.beta  ?? 0) * 100);
 
