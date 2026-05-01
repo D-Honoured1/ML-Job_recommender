@@ -154,7 +154,7 @@ export default function NavMenu() {
   return (
     <header style={S.header} className="rec-header">
       <div style={S.inner}>
-        <Link to="/" style={S.logo}>Skai</Link>
+        <Link to="/" style={S.logo}>HJR System</Link>
 
         <div style={{ position: "relative" }} ref={menuRef}>
           <button style={S.hamburger} onClick={() => setOpen((v) => !v)} aria-label="Menu">

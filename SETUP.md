@@ -1,6 +1,6 @@
 # HJR-System — Setup Guide
 
-Follow these steps on the new machine to get the project running.
+Follow these steps on any new machine to get the project running.
 
 ---
 
@@ -24,8 +24,13 @@ psql --version
 
 ## Step 1 — Copy the Project
 
-Transfer the entire `Skai/` folder to the new machine. All CSV data files are
-included inside `backend/data/` and will work immediately.
+Transfer the entire `Skai/` folder to the new machine.
+
+> **Important:** Do **not** copy the `backend/.venv/` folder — it is compiled for the
+> source machine's OS and Python version and will not work elsewhere. You will
+> create a fresh one in Step 3.
+
+All CSV job data is included in `backend/data/` and will work immediately.
 
 ---
 
@@ -58,7 +63,6 @@ source .venv/bin/activate
 # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
-pip install psycopg2-binary
 ```
 
 ---
@@ -69,23 +73,35 @@ pip install psycopg2-binary
 python manage.py migrate
 ```
 
-You should see a list of migrations applied with `OK` next to each one.
+You should see all migrations listed with `OK` next to each one.
 
 ---
 
-## Step 5 — Start the Backend
+## Step 5 — Load Job Data
+
+This populates the database from the included CSV file. Run it once:
+
+```bash
+python manage.py load_jobs
+```
+
+You should see a confirmation that jobs were loaded (e.g. `Loaded 2500 jobs`).
+
+---
+
+## Step 6 — Start the Backend
 
 ```bash
 python manage.py runserver
 ```
 
-The API will be available at `http://localhost:8000`
+The API will be available at `http://localhost:8000`.
 
 ---
 
-## Step 6 — Set Up the Frontend
+## Step 7 — Set Up the Frontend
 
-Open a new terminal:
+Open a **new terminal** (keep the backend terminal running):
 
 ```bash
 cd Skai/frontend
@@ -95,22 +111,22 @@ npm install
 
 ---
 
-## Step 7 — Start the Frontend
+## Step 8 — Start the Frontend
 
 ```bash
 npm start
 ```
 
-The app will open at `http://localhost:3000`
+The app will open at `http://localhost:3000`.
 
 ---
 
-## Step 8 — Verify It Works
+## Step 9 — Verify It Works
 
 1. Open `http://localhost:3000` in your browser
-2. Type `U001` in the User ID field and click **Recommend**
-3. You should see a grid of job cards — the engine is working
-4. Click **Register** to create an account and test authenticated recommendations
+2. Click **Create account** and register with your details
+3. Your personalised job recommendations will load automatically
+4. Use the search bar to search all 2,500 jobs by title, company, location, or skills
 
 ---
 
@@ -118,4 +134,8 @@ The app will open at `http://localhost:3000`
 
 - The backend must be running on port **8000** before starting the frontend
 - Both terminals must stay open while using the app
-- Uploaded resume files (if any) are stored in `backend/media/resumes/` — copy that folder from the old machine if you need to preserve them
+- Uploaded resume files (if any) are stored in `backend/media/resumes/` — copy that
+  folder from the old machine if you need to preserve them
+- Database credentials (`skai_user` / `skai1234`) are the default values baked into
+  `backend/config/settings.py` — they can be overridden with the environment variables
+  `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_HOST`, `DB_PORT` if your PostgreSQL setup differs

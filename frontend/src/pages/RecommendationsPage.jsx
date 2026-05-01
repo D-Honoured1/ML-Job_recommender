@@ -48,7 +48,7 @@ const S = {
     maxWidth: "1200px", margin: "0 auto", width: "100%",
     display: "flex", alignItems: "center", justifyContent: "space-between",
   },
-  logo: { fontSize: "1.8rem", fontWeight: 900, color: C.blue, textDecoration: "none", letterSpacing: "-1px", fontStyle: "italic" },
+  logo: { fontSize: "2rem", fontWeight: 900, color: C.blue, textDecoration: "none", letterSpacing: "-1px", fontStyle: "italic", flexShrink: 0 },
 
   hamburger: {
     position: "relative", width: "40px", height: "40px",
@@ -406,7 +406,7 @@ export default function RecommendationsPage() {
       <div style={{ ...S.page, display: "flex", flexDirection: "column" }}>
         <header style={S.header} className="rec-header">
           <div style={S.headerInner} className="rec-header-inner">
-            <Link to="/" style={S.logo}>Skai</Link>
+            <Link to="/" style={S.logo}>HJR System</Link>
             <div style={S.navBtns}>
               <Link to="/login" style={S.navLink}>Sign in</Link>
               <Link to="/register" style={S.navLinkFill}>Create account</Link>
@@ -417,7 +417,7 @@ export default function RecommendationsPage() {
           <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>💼</div>
           <p style={S.loginPromptTitle}>Sign in to see your job matches</p>
           <p style={S.loginPromptText}>
-            Skai recommends jobs based on your skills and what professionals like you are applying to.
+            HJR System recommends jobs based on your skills and what professionals like you are applying to.
           </p>
           <Link to="/login" style={S.loginPromptBtn}>Sign in</Link>
           <p style={{ marginTop: "1rem", fontSize: "0.85rem", color: C.text3 }}>
@@ -433,7 +433,7 @@ export default function RecommendationsPage() {
       {/* Header */}
       <header style={S.header} className="rec-header">
         <div style={S.headerInner} className="rec-header-inner">
-          <Link to="/" style={S.logo}>Skai</Link>
+          <Link to="/" style={S.logo}>HJR System</Link>
 
           <div style={{ position: "relative" }} ref={menuRef}>
             <button style={S.hamburger} onClick={() => setMenuOpen((v) => !v)} aria-label="Menu" className="rec-hamburger">
