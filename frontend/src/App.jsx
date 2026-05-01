@@ -1,10 +1,12 @@
-import React from "react";
 import "./responsive.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import RecommendationsPage from "./pages/RecommendationsPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ProfilePage from "./pages/ProfilePage";
+import ApplicationsPage from "./pages/ApplicationsPage";
+import ReviewsPage from "./pages/ReviewsPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 function PrivateRoute({ children }) {
   return localStorage.getItem("access_token") ? children : <Navigate to="/login" replace />;
@@ -18,6 +20,9 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="/applications" element={<PrivateRoute><ApplicationsPage /></PrivateRoute>} />
+        <Route path="/reviews" element={<PrivateRoute><ReviewsPage /></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

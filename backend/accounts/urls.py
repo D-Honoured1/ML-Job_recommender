@@ -8,6 +8,10 @@ from accounts.views import (
     ProfileView,
     ResumeUploadView,
     JobInteractView,
+    ApplicationsView,
+    ReviewView,
+    NotificationsView,
+    NotificationsMarkReadView,
 )
 
 urlpatterns = [
@@ -18,4 +22,8 @@ urlpatterns = [
     path("auth/profile/", ProfileView.as_view(), name="profile"),
     path("auth/profile/resume/", ResumeUploadView.as_view(), name="resume_upload"),
     path("jobs/interact/", JobInteractView.as_view(), name="job_interact"),
+    path("applications/", ApplicationsView.as_view(), name="applications"),
+    path("reviews/", ReviewView.as_view(), name="reviews"),
+    path("notifications/", NotificationsView.as_view(), name="notifications"),
+    path("notifications/mark-read/", NotificationsMarkReadView.as_view(), name="notifications_mark_read"),
 ]

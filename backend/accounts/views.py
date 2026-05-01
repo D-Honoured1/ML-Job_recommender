@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from accounts.models import UserProfile, JobInteraction
+from accounts.models import UserProfile, JobInteraction, Review, Notification
 from accounts.serializers import RegisterSerializer, UserProfileSerializer, ProfileUpdateSerializer
 
 
@@ -100,7 +100,6 @@ class ResumeUploadView(APIView):
         profile.resume_file = file
         profile.save()
 
-        # Extract text and parse skills
         extracted_skills = []
         try:
             with pdfplumber.open(file) as pdf:
@@ -155,3 +154,111 @@ class JobInteractView(APIView):
             interaction_type=interaction_type,
         )
         return Response({"message": "Interaction recorded."}, status=201)
+
+
+class ApplicationsView(APIView):
+    """GET /api/applications/ — all applied jobs for the logged-in user"""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from recommender.models import Job
+
+        interactions = JobInteraction.objects.filter(
+            user=request.user, interaction_type="applied"
+        )
+        seen = set()
+        result = []
+        for interaction in interactions:
+            if interaction.job_id in seen:
+                continue
+            seen.add(interaction.job_id)
+            try:
+                job = Job.objects.get(job_id=interaction.job_id)
+                result.append({
+                    "job_id": interaction.job_id,
+                    "job_title": job.job_title,
+                    "company": job.company,
+                    "location": job.location,
+                    "applied_at": interaction.timestamp,
+                    "status": "Application Submitted",
+                })
+            except Job.DoesNotExist:
+                pass
+        return Response(result)
+
+
+class ReviewView(APIView):
+    """GET/POST /api/reviews/"""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from recommender.models import Job
+
+        reviews = Review.objects.filter(user=request.user)
+        result = []
+        for review in reviews:
+            try:
+                job = Job.objects.get(job_id=review.job_id)
+                result.append({
+                    "id": review.id,
+                    "job_id": review.job_id,
+                    "job_title": job.job_title,
+                    "company": job.company,
+                    "rating": review.rating,
+                    "comment": review.comment,
+                    "created_at": review.created_at,
+                })
+            except Job.DoesNotExist:
+                pass
+        return Response(result)
+
+    def post(self, request):
+        job_id = request.data.get("job_id", "").strip()
+        rating = request.data.get("rating")
+        comment = request.data.get("comment", "")
+
+        if not job_id:
+            return Response({"error": "job_id is required."}, status=400)
+        if rating is None:
+            return Response({"error": "rating is required."}, status=400)
+        try:
+            rating = int(rating)
+        except (TypeError, ValueError):
+            return Response({"error": "rating must be a number."}, status=400)
+        if not 1 <= rating <= 5:
+            return Response({"error": "rating must be between 1 and 5."}, status=400)
+
+        review, created = Review.objects.update_or_create(
+            user=request.user,
+            job_id=job_id,
+            defaults={"rating": rating, "comment": comment},
+        )
+        return Response({"message": "Review saved.", "id": review.id}, status=201 if created else 200)
+
+
+class NotificationsView(APIView):
+    """GET /api/notifications/"""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(user=request.user)
+        return Response([{
+            "id": n.id,
+            "message": n.message,
+            "is_read": n.is_read,
+            "created_at": n.created_at,
+            "notification_type": n.notification_type,
+        } for n in notifications])
+
+
+class NotificationsMarkReadView(APIView):
+    """POST /api/notifications/mark-read/"""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({"message": "All notifications marked as read."})
