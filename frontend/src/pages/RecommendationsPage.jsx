@@ -267,7 +267,7 @@ function JobDetailPanel({ job, onApply, onBack }) {
         </div>
       )}
 
-      <button style={S.applyBtn} onClick={() => onApply(job)}>
+      <button style={S.applyBtn} onClick={(e) => { e.stopPropagation(); onApply(job); }}>
         Apply on LinkedIn
       </button>
 
