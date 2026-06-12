@@ -1,4 +1,4 @@
-# Skai — Hybrid Job Recommender
+# Hybrid Job Recommender
 
 A full-stack job recommendation system that blends **Content-Based Filtering (CBF)** and **Collaborative Filtering (CF)** into a weighted hybrid model. The system personalises recommendations using a user's profile skills and the behaviour of similar users, with weights that shift dynamically as the user engages with the platform.
 
